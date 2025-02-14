@@ -1,0 +1,232 @@
+<template>
+  <Layout>
+    <div class="container-xxl mt-4">
+
+      <!-- ✅ Affichage uniquement si l'utilisateur est connecté -->
+      <div v-if="!errorMessage">
+        <h2 class="text-center mb-3">📅 Planning des Cours</h2>
+        <p class="text-muted text-center">Clique sur une ligne pour rejoindre ton cours.</p>
+      </div>
+
+      <!-- ✅ Chargement avec message -->
+      <div v-if="loading" class="d-flex flex-column align-items-center mt-4">
+        <div class="spinner-border text-primary mb-2" role="status"></div>
+        <p class="text-muted">Chargement de ton planning...</p>
+      </div>
+
+      <!-- ✅ Message si l'utilisateur n'est pas connecté -->
+      <div v-if="!loading && errorMessage" class="alert alert-info text-center mt-3">
+        <h4 class="fw-bold">🎸 Rejoins SunBassSchool et commence ton apprentissage !</h4>
+        <p class="mb-3">
+          Il semble que tu n’es pas encore connecté. Pour accéder à ton planning et réserver tes cours de basse, 
+          connecte-toi ou crée un compte dès maintenant !
+        </p>
+        <div class="d-flex justify-content-center gap-3">
+          <a href="/login" class="btn btn-primary">Se connecter</a>
+          <a href="/Registerform" class="btn btn-success">S'inscrire</a>
+        </div>
+      </div>
+
+      <!-- ✅ Message si aucun cours trouvé, mais seulement après le chargement -->
+      <div v-if="!loading && planningData.length === 0 && !errorMessage" class="alert alert-warning text-center mt-3">
+        Aucun cours trouvé pour ton compte.
+      </div>
+
+      <!-- ✅ Tableau des cours, affiché uniquement après le chargement -->
+      <div v-if="!loading && planningData.length > 0" class="table-responsive mt-3">
+        <table class="table table-hover shadow-sm">
+          <thead class="table-dark">
+            <tr>
+              <th scope="col">📆 Date & Heure</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, index) in planningData" :key="index" @click="openMeet(row.meet)" class="clickable-row">
+              <td><strong>{{ row.formattedDate }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </Layout>
+</template>
+
+
+
+<script>
+import Layout from "../views/Layout.vue";
+import axios from "axios";
+import { ref, onMounted } from "vue";
+
+export default {
+  name: "Planning",
+  components: {
+    Layout,
+  },
+  setup() {
+    const planningData = ref([]);
+    const loading = ref(true);
+    const errorMessage = ref("");
+
+    const API_URL = "https://script.google.com/macros/s/AKfycbzGV13_iuC5shxErpbzwJoRBLGPHsH5osBvw0K2M_xh_TsJx9P0Fq1A0_1S4XDd0AW3nA/exec";
+
+    // Récupération du prénom et de l'email à chaque appel
+    const getUserInfo = () => {
+      return {
+        prenom: localStorage.getItem("prenom"),
+        email: localStorage.getItem("email"),
+      };
+    };
+
+    const cacheDuration = 5 * 60 * 1000;
+
+    const formatDate = (rawDate) => {
+      if (!rawDate) return "Date invalide";
+
+      const match = rawDate.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
+      if (!match) return "Date invalide";
+
+      const [, day, month, year, hours, minutes] = match.map(Number);
+      const parsedDate = new Date(year, month - 1, day, hours, minutes);
+
+      return isNaN(parsedDate.getTime())
+        ? "Date invalide"
+        : new Intl.DateTimeFormat("fr-FR", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(parsedDate);
+    };
+
+    const fetchPlanningData = async () => {
+      const { prenom, email } = getUserInfo(); // Récupération des infos utilisateur
+
+      if (!prenom || !email) {
+        errorMessage.value = "🎸 **Rejoins SunBassSchool et commence ton apprentissage !**\nIl semble que tu n’es pas encore connecté. Pour accéder à ton planning et réserver tes cours de basse, connecte-toi ou crée un compte dès maintenant !\n👉 [Se connecter](#) | [S'inscrire](#)";
+        loading.value = false;
+        return;
+      }
+
+      const cacheKey = `planning_${email}_${prenom}`;
+      const cacheTimestampKey = `${cacheKey}_timestamp`;
+      const cachedData = localStorage.getItem(cacheKey);
+      const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
+
+      const cacheExpired = !cacheTimestamp || (Date.now() - cacheTimestamp > cacheDuration);
+
+      if (cachedData && !cacheExpired) {
+  try {
+    const parsedData = JSON.parse(cachedData);
+    if (!Array.isArray(parsedData) || parsedData.length === 0) {
+      throw new Error("Cache corrompu, suppression...");
+    }
+    console.log("⚡ Chargement du planning depuis le cache");
+    planningData.value = parsedData;
+    loading.value = false;
+    return;
+  } catch (error) {
+    console.warn(error.message);
+    localStorage.removeItem(cacheKey);
+    localStorage.removeItem(cacheTimestampKey);
+  }
+}
+
+      if (cacheExpired) {
+        console.log("🔄 Cache expiré, récupération des nouvelles données...");
+        localStorage.removeItem(cacheKey);
+        localStorage.removeItem(cacheTimestampKey);
+      }
+
+      try {
+        console.log(
+          "🌐 Requête envoyée :",
+          `${API_URL}?route=planning&email=${encodeURIComponent(email)}&prenom=${encodeURIComponent(prenom)}`
+        );
+        const response = await axios.get(
+          `${API_URL}?route=planning&email=${encodeURIComponent(email)}&prenom=${encodeURIComponent(prenom)}`
+        );
+
+        console.log("✅ Données reçues :", response.data);
+
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          planningData.value = response.data.map((item) => ({
+            date: item.date,
+            formattedDate: item.date ? formatDate(item.date) : "Date invalide",
+            meet: item.meet,
+          }));
+
+          localStorage.setItem(cacheKey, JSON.stringify(planningData.value));
+          localStorage.setItem(cacheTimestampKey, Date.now());
+        } else {
+          errorMessage.value = "Aucun cours trouvé.";
+          planningData.value = [];
+        }
+      } catch (error) {
+        console.error("❌ Erreur lors du chargement des cours :", error);
+        errorMessage.value = "Erreur de chargement des cours.";
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const openMeet = (url) => {
+      if (url) {
+        window.open(url, "_blank");
+      }
+    };
+
+    onMounted(fetchPlanningData);
+
+    return { planningData, loading, errorMessage, openMeet };
+  },
+};
+</script>
+
+
+
+
+
+
+
+
+
+<style scoped>
+/* ✅ Style amélioré */
+h2 {
+  font-weight: bold;
+  color: #343a40;
+}
+
+.table {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* ✅ Meilleure lisibilité sur mobile */
+.table th, .table td {
+  padding: 15px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table th {
+  background-color: #212529;
+  color: #ffffff;
+}
+
+/* ✅ Effet au survol et curseur main */
+.table-hover tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+/* ✅ Gestion des erreurs */
+.alert {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+</style>
