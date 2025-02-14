@@ -1,7 +1,7 @@
 <template>
   <Layout>
     <div class="container mt-4">
-      <h2 class="text-center mb-3">🎸 Replays des Cours</h2>
+      <h2 class="text-center mb-3">🎸 Replays des Cours test </h2>
       <p class="text-muted text-center">Clique sur une vidéo pour la regarder directement.</p>
 
       <!-- Barre de recherche -->
