@@ -12,8 +12,9 @@ import MonEspace from '@/views/MonEspace.vue'
 import RegisterForm from '@/views/RegisterForm.vue'
 import Prendreuncours from '@/views/Prendreuncours.vue'
 
+const baseUrl = import.meta.env.MODE === "production" ? "/app/" : "/";
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(baseUrl),
   routes: [
     {
       path: '/',
@@ -80,6 +81,7 @@ const router = createRouter({
       component: Prendreuncours,
     },
   ],
-})
+});
+
 
 export default router

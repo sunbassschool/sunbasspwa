@@ -5,7 +5,17 @@
         <div class="w-100 mx-auto">
           <div class="card shadow p-5">
             <h2 class="text-center mb-4">🔐 Connexion</h2>
-            <form @submit.prevent="login">
+
+            <!-- Spinner pendant le chargement -->
+            <div v-if="isLoading" class="text-center">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+              </div>
+              <p class="mt-3">Connexion en cours...</p>
+            </div>
+
+            <!-- Formulaire de connexion -->
+            <form v-else @submit.prevent="login">
               <div class="mb-3">
                 <label for="email" class="form-label">Adresse e-mail</label>
                 <input 
@@ -46,6 +56,7 @@
   </Layout>
 </template>
 
+
 <script>
 import Layout from "../views/Layout.vue";
 
@@ -54,111 +65,86 @@ export default {
   components: { Layout },
   data() {
     return {
-      email: localStorage.getItem("email") || "",  // ✅ Récupération dès le début
-      prenom: localStorage.getItem("prenom") || "",  // ✅ Récupération dès le début
+      email: localStorage.getItem("email") || "", 
+      prenom: localStorage.getItem("prenom") || "",  
       password: "",
-      message: "",
-      messageType: "",
-      sheetURL: "https://script.google.com/macros/s/AKfycbxHbFX8z5qQa46v_nfX4N85_U-XmjPbfrI1n_CNLTPe16j_jwA-sj30jgeaShWdWC5Mqg/exec",
-      updateURL: "https://thingproxy.freeboard.io/fetch/https://script.google.com/macros/s/AKfycbxHbFX8z5qQa46v_nfX4N85_U-XmjPbfrI1n_CNLTPe16j_jwA-sj30jgeaShWdWC5Mqg/exec"
+      message: "", // ✅ Garder uniquement pour les erreurs
+      isLoading: false, // 🚀 Gestion du spinner
+      sheetURL: "https://script.google.com/macros/s/AKfycbz3mq5O5fnLXqIHgzVJS2eZhqEteR_4tGgRDjuTfvfRN3-ZHVcfUtVsTla714P2HLLP9g/exec",
+      updateURL: "https://thingproxy.freeboard.io/fetch/https://script.google.com/macros/s/AKfycbz3mq5O5fnLXqIHgzVJS2eZhqEteR_4tGgRDjuTfvfRN3-ZHVcfUtVsTla714P2HLLP9g/exec"
     };
-  },
-  mounted() {
-    console.log("✅ Page montée, vérification des valeurs stockées :");
-    console.log("LocalStorage - prenom:", localStorage.getItem("prenom"));
-    console.log("LocalStorage - email:", localStorage.getItem("email"));
-  },
-
-  watch: {
-    email(newEmail, oldEmail) {
-      if (newEmail && newEmail !== oldEmail) {
-        localStorage.setItem("email", newEmail);
-      }
-    },
-    prenom(newPrenom, oldPrenom) {
-      if (newPrenom && newPrenom !== oldPrenom) {
-        localStorage.setItem("prenom", newPrenom);
-      }
-    }
   },
 
   methods: {
-    async sha256(text) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(text);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-    },
-
     async login() {
+      console.time("⏳ Début login");
+      this.isLoading = true; // 🚀 Activation du spinner
+      this.message = ""; // ✅ Effacer tout message précédent
+
       if (!this.email || !this.password) {
         this.message = "Veuillez remplir tous les champs.";
-        this.messageType = "alert-danger";
+        this.isLoading = false;
         return;
       }
 
-      const hashedPassword = await this.sha256(this.password);
-
       try {
-        console.log("📡 Envoi de la requête pour récupérer les utilisateurs...");
+        console.time("🔐 Hachage SHA-256");
+        const hashedPassword = await this.sha256(this.password);
+        console.timeEnd("🔐 Hachage SHA-256");
+
+        console.time("📡 Fetch getUsers");
         const response = await fetch(this.sheetURL);
+        console.timeEnd("📡 Fetch getUsers");
 
-        if (!response.ok) {
-          const errorText = await response.text(); // Récupérer le message d'erreur du serveur
-          throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
-        }
-
+        console.time("📂 JSON parsing");
         const users = await response.json();
-        console.log("🔍 Données récupérées :", users);
+        console.timeEnd("📂 JSON parsing");
 
-        if (!Array.isArray(users)) {
-          throw new Error("Données inattendues : la réponse n'est pas un tableau.");
-        }
-
-        // Vérifier la présence des champs avant de faire un .trim()
+        console.time("🔍 Recherche utilisateur");
         const user = users.find(user =>
           user.email?.trim() === this.email.trim() &&
           user.hashedCode?.trim() === hashedPassword
         );
+        console.timeEnd("🔍 Recherche utilisateur");
 
         if (!user) {
-          console.error("❌ Aucun utilisateur trouvé avec cet email et ce mot de passe !");
           this.message = "❌ Identification échouée";
-          this.messageType = "alert-danger";
+          this.isLoading = false;
           return;
         }
 
-        // ✅ Stockage dans localStorage et mise à jour immédiate
+        console.time("💾 Stockage LocalStorage");
         localStorage.setItem("prenom", user.prenom?.trim() || "");
         localStorage.setItem("email", user.email?.trim() || "");
+        console.timeEnd("💾 Stockage LocalStorage");
 
         this.prenom = user.prenom?.trim() || "";
         this.email = user.email?.trim() || "";
 
-        this.message = "✅ Identifiant OK";
-        this.messageType = "alert-success";
-
-        // 🔥 Mise à jour de la dernière connexion
+        console.time("📡 Mise à jour dernière connexion");
         await fetch(this.updateURL, {
           method: "POST",
           mode: "cors",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: this.email, hashedPassword })
         });
+        console.timeEnd("📡 Mise à jour dernière connexion");
 
-        // ✅ Sécurisation de la redirection
+        this.isLoading = false; // 🚀 Désactivation du spinner
+
+        console.time("➡️ Redirection vers dashboard");
         if (this.$router) {
           this.$router.push('/dashboard');
-        } else {
-          console.warn("🚨 Redirection échouée : Vue Router non disponible !");
         }
+        console.timeEnd("➡️ Redirection vers dashboard");
 
       } catch (error) {
-        console.error("🚨 Erreur lors de la récupération des utilisateurs :", error);
-        this.message = `Erreur de connexion : ${error.message}`;
-        this.messageType = "alert-danger";
+        console.error("🚨 Erreur lors de la connexion :", error);
+        this.message = "❌ Une erreur est survenue. Veuillez réessayer.";
+        this.isLoading = false;
       }
+
+      console.timeEnd("⏳ Début login");
     },
 
     logout() {
@@ -167,13 +153,22 @@ export default {
 
       this.prenom = "";
       this.email = "";
-
       this.message = "Vous êtes déconnecté.";
-      this.messageType = "alert-info";
+    },
+
+    async sha256(text) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
     }
   }
 };
 </script>
+
+
+
 
 
 <style scoped>

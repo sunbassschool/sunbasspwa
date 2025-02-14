@@ -1,8 +1,17 @@
 <template>
   <Layout>
     <div class="container d-flex flex-column align-items-center justify-content-center">
-      <div v-if="!isLoggedIn" class="content text-center">
-        <!-- Message d'accueil pour l'élève non connecté -->
+      
+      <!-- 🔄 Spinner affiché pendant le chargement -->
+      <div v-if="isLoading" class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Chargement...</span>
+        </div>
+        <p class="mt-3">Chargement en cours...</p>
+      </div>
+
+      <!-- Si l'élève n'est pas connecté -->
+      <div v-else-if="!isLoggedIn" class="content text-center">
         <h2 class="mb-4">Bienvenue sur l'application SunBassSchool !</h2>
         <p class="text-muted mb-5">Pour accéder à vos informations, vous devez vous connecter ou vous inscrire.</p>
         
@@ -12,7 +21,7 @@
         </div>
       </div>
 
-      <!-- Contenu principal, si l'élève est connecté -->
+      <!-- Contenu principal si l'élève est connecté -->
       <div v-else class="content">
         <div 
           v-for="(card, index) in cards" 
@@ -20,7 +29,6 @@
           class="fade-in"
           :class="{ 'first-card': index === 0 }"
         >
-          <!-- Carte -->
           <div class="dashboard-card rounded-3 p-4 d-flex align-items-center">
             <i :class="card.icon" class="icon me-3"></i>
             <div>
@@ -28,14 +36,14 @@
               <p class="text-muted mb-0">{{ card.text }}</p>
             </div>
           </div>
-
-          <!-- Séparateur sauf pour la dernière carte -->
           <div v-if="index < cards.length - 1" class="separator"></div>
         </div>
       </div>
+
     </div>
   </Layout>
 </template>
+
 
 <script>
 import Layout from "../views/Layout.vue";
@@ -53,6 +61,7 @@ export default {
       objectif: "",
       prochainCours: "",
       isLoggedIn: false, // L'élève n'est pas connecté par défaut
+      isLoading: true, // 🚀 Ajout du spinner au chargement
       cacheDuration: 5 * 60 * 1000, // ⏳ Durée du cache : 5 minutes (en millisecondes)
     };
   },
@@ -63,19 +72,20 @@ export default {
     if (email && prenom) {
       this.isLoggedIn = true;
       this.fetchStudentData(email, prenom);
+    } else {
+      this.isLoading = false; // 🚀 Désactive le spinner si pas connecté
     }
   },
   methods: {
     async fetchStudentData(email, prenom) {
-      // Vérifier si les données sont déjà en cache
       const cacheKey = `planning_${email}_${prenom}`;
       const cachedData = localStorage.getItem(cacheKey);
       const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
 
-      // 🔹 Vérifier si le cache est valide (moins de 5 minutes)
       if (cachedData && cacheTimestamp && Date.now() - cacheTimestamp < this.cacheDuration) {
         console.log("⚡ Chargement des données depuis le cache");
         this.updateData(JSON.parse(cachedData));
+        this.isLoading = false; // ✅ Désactive le spinner après chargement
         return;
       }
 
@@ -86,8 +96,6 @@ export default {
         });
 
         const data = response.data;
-        
-        // ✅ Stocker les données dans le cache local
         localStorage.setItem(cacheKey, JSON.stringify(data));
         localStorage.setItem(`${cacheKey}_timestamp`, Date.now());
 
@@ -96,6 +104,8 @@ export default {
         console.error("❌ Erreur lors de la récupération des données : ", error);
         this.displayError();
       }
+
+      this.isLoading = false; // ✅ Désactive le spinner après la requête
     },
 
     updateData(data) {
@@ -132,18 +142,16 @@ export default {
       ];
     },
 
-    redirectToSignUp() {
-      window.location.href = "/signup"; 
-    },
     redirectToRegisterform() {
       this.$router.push("/Registerform");
     },
     redirectToLogin() {
-      window.location.href = "/login";
+      this.$router.push("/login"); // ✅ Utilise Vue Router
     },
   },
 };
 </script>
+
 
 
 <style scoped>
@@ -167,6 +175,11 @@ export default {
 .first-card {
   margin-top: 10px;
 }
+.spinner-border {
+  width: 3rem;
+  height: 3rem;
+}
+
 
 /* Cartes */
 .dashboard-card {
