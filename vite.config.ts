@@ -31,14 +31,14 @@ export default defineConfig(({ mode }) => {
           background_color: '#1a1a2e',
           icons: [
             {
-              src: `${env.VITE_BASE_URL || "/"}assets/logo.png`,
-              sizes: '192x192',
-              type: 'image/png',
+              src: `${env.VITE_BASE_URL || ""}/logo-192x192.png`,
+              sizes: "192x192",
+              type: "image/png",
             },
             {
-              src: `${env.VITE_BASE_URL || "/"}assets/logo.png`,
-              sizes: '512x512',
-              type: 'image/png',
+              src: `${env.VITE_BASE_URL || ""}/logo-512x512.png`,
+              sizes: "512x512",
+              type: "image/png",
             },
           ],
         },
@@ -52,6 +52,14 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
+      },
+    },
+    build: {
+      minify: 'terser',  // Utilise Terser pour la minification en production
+      terserOptions: {
+        compress: {
+          drop_console: true,  // Supprime tous les logs console.*
+        },
       },
     },
   };

@@ -13,6 +13,7 @@ import RegisterForm from '@/views/RegisterForm.vue'
 import Prendreuncours from '@/views/Prendreuncours.vue'
 
 const baseUrl = import.meta.env.MODE === "production" ? "/app/" : "/";
+
 const router = createRouter({
   history: createWebHistory(baseUrl),
   routes: [
@@ -23,7 +24,8 @@ const router = createRouter({
     {
       path: '/mon-espace',
       name: 'mon-espace',
-      component: MonEspace
+      component: MonEspace,
+      meta: { requiresAuth: true } // 🔥 Protection activée ici
     },
     {
       path: '/intro',
@@ -54,11 +56,13 @@ const router = createRouter({
       path: '/planning',
       name: 'planning',
       component: Planning,
+      meta: { requiresAuth: true } // 🔥 Protection activée ici
     },
     {
       path: '/replay',
       name: 'replay',
       component: Replay,
+      meta: { requiresAuth: true } // 🔥 Protection activée ici
     },
     {
       path: '/videos',
@@ -69,6 +73,7 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard',
       component: Dashboard,
+      meta: { requiresAuth: true } // 🔥 Protection activée ici
     },
     {
       path: '/login',
@@ -83,5 +88,16 @@ const router = createRouter({
   ],
 });
 
+// **🚀 Middleware global pour protéger les routes nécessitant l'authentification**
+router.beforeEach((to, from, next) => {
+  const isAuthenticated = !!localStorage.getItem("token"); // Vérifie si un token existe
 
-export default router
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    console.warn("🚨 Accès refusé, redirection vers /login !");
+    next('/login'); // 🔥 Redirection vers login
+  } else {
+    next(); // ✅ Accès autorisé
+  }
+});
+
+export default router;

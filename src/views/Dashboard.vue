@@ -175,10 +175,6 @@ export default {
 .first-card {
   margin-top: 10px;
 }
-.spinner-border {
-  width: 3rem;
-  height: 3rem;
-}
 
 
 /* Cartes */

@@ -82,7 +82,8 @@ export default {
       playlistyoutube: "",
       loading: true,
       error: "",
-      apiURL: "https://script.google.com/macros/s/AKfycby6El-IE3uF-ktu2wS13UtPGoktVuPGr56af8ctZ2hv1UUBEpCDWaOL06YRetDR54bGjQ/exec"
+      apiURL: "",  // Initialisation vide, l'URL sera définie dans mounted
+      cacheDuration: 5 * 60 * 1000, // ⏳ Durée du cache : 5 minutes
     };
   },
   computed: {
@@ -98,8 +99,10 @@ export default {
     console.log("🔍 LocalStorage récupéré - Prénom:", prenom);
 
     if (email && prenom) {
-      this.email = email.trim().toLowerCase();
-      this.prenom = prenom.trim(); // On enlève les espaces au cas où
+      this.email = email;
+      this.prenom = prenom;
+      // Définir l'URL dynamiquement après avoir récupéré email et prénom
+      this.apiURL = `https://script.google.com/macros/s/AKfycbxAP5BgdCAxKbVb5SguGp8G_RHD--3KUXcsIpKDpJMaDXtAA1E2KVtMBSqw6mHgTPP7vg/exec?route=getUsers&email=${encodeURIComponent(this.email)}&prenom=${encodeURIComponent(this.prenom)}`;
       this.fetchStudentData();
     } else {
       this.error = "Utilisateur non connecté.";
@@ -107,68 +110,70 @@ export default {
     }
   },
   methods: {
-    async fetchStudentData() {
-      const cacheKey = `studentData_${this.email}`;
-      const cacheExpirationKey = `${cacheKey}_expiration`;
-      const cachedData = localStorage.getItem(cacheKey);
-      const cacheExpiration = localStorage.getItem(cacheExpirationKey);
+  async fetchStudentData() {
+    const cacheKey = `studentData_${this.email}`;
+    const cacheExpirationKey = `${cacheKey}_expiration`;
+    const cachedData = localStorage.getItem(cacheKey);
+    const cacheExpiration = localStorage.getItem(cacheExpirationKey);
 
-      const isCacheValid = cachedData && cacheExpiration && Date.now() < parseInt(cacheExpiration, 10);
+    const isCacheValid = cachedData && cacheExpiration && Date.now() < parseInt(cacheExpiration, 10);
 
-      if (!isCacheValid) {
-        console.log("🔄 Cache expiré, récupération des nouvelles données...");
-        localStorage.removeItem(cacheKey);
-        localStorage.removeItem(cacheExpirationKey);
-      } else {
-        console.log("⚡ Chargement des données depuis le cache");
-        const data = JSON.parse(cachedData)[0]; // Prendre le premier objet du tableau
-
-        console.log("✅ Données chargées depuis le cache :", data);
-
-        this.prenom = data.prenom || "Utilisateur";
-        this.meetLink = data.meet;
-        this.nextCourseDate = data.nextCourseDate;
-        this.notifications = data.notifications || [];
-        this.objectif = data.objectif || "";
-        this.playlistyoutube = data.playlistyoutube || "";
-        this.loading = false;
-        this.$forceUpdate(); // 🔥 Force la mise à jour de Vue
-        return;
-      }
-
-      try {
-        console.log("🌐 Requête envoyée :", `${this.apiURL}?email=${encodeURIComponent(this.email)}`);
-        const response = await fetch(`${this.apiURL}?email=${encodeURIComponent(this.email)}`);
-        const data = await response.json();
-
-        console.log("📩 Données reçues de l'API :", data);
-
-        if (data.error) {
-          this.error = data.error;
-        } else {
-          this.prenom = data.prenom || "Utilisateur";
-          this.meetLink = data.meet;
-          this.nextCourseDate = data.nextCourseDate;
-          this.notifications = data.notifications || [];
-          this.objectif = data.objectif || "";
-          this.playlistyoutube = data.playlistyoutube || "";
-
-          // ✅ Stocker les nouvelles données en cache (valable 5 minutes)
-          localStorage.setItem(cacheKey, JSON.stringify(data));
-          localStorage.setItem(cacheExpirationKey, (Date.now() + 5 * 60 * 1000).toString());
-
-          this.$forceUpdate(); // 🔥 Force la mise à jour de Vue
-        }
-      } catch (err) {
-        this.error = "Erreur de récupération des données.";
-        console.error("❌ Erreur lors de la requête API :", err);
-      } finally {
-        this.loading = false;
-      }
+    if (isCacheValid) {
+      console.log("⚡ Chargement des données depuis le cache");
+      this.updateStudentData(JSON.parse(cachedData));
+      this.loading = false; // ✅ Arrête le spinner
+      return;
     }
+
+    console.log("🔄 Cache expiré, récupération des nouvelles données...");
+    localStorage.removeItem(cacheKey);
+    localStorage.removeItem(cacheExpirationKey);
+
+    try {
+      console.log("🌐 Requête envoyée :", this.apiURL);
+      const response = await fetch(this.apiURL);
+
+      if (!response.ok) throw new Error(`Erreur HTTP : ${response.status}`);
+
+      const data = await response.json();
+      console.log("📩 Données reçues de l'API :", data);
+
+      // Vérification du type de la réponse (objet unique, pas un tableau)
+      if (data && data.email && data.prenom) {
+        // ✅ Mise à jour des données avec l'utilisateur
+        this.updateStudentData(data);
+
+        // ✅ Stocker les nouvelles données en cache
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        localStorage.setItem(cacheExpirationKey, (Date.now() + this.cacheDuration).toString());
+      } else {
+        this.error = "❌ Données incorrectes reçues de l'API.";
+        console.error("❌ Données incorrectes reçues : ", data);
+      }
+
+    } catch (err) {
+      this.error = "❌ Erreur de récupération des données.";
+      console.error("❌ Erreur lors de la requête API :", err);
+    } finally {
+      this.loading = false; // ✅ Toujours arrêter le spinner
+    }
+  },
+
+  updateStudentData(data) {
+    this.prenom = data.prenom ?? "Utilisateur";
+    this.meetLink = data.meet ?? "Aucun lien disponible";
+    this.nextCourseDate = data.nextCourseDate ?? "Aucune date prévue";
+    this.notifications = data.notifications ?? [];
+    this.objectif = data.objectif ?? "Aucun objectif défini";
+    this.playlistyoutube = data.playlistyoutube ?? "";
   }
+}
+
 };
 </script>
+
+
+
 
 
 

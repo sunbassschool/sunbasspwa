@@ -1,16 +1,29 @@
 <template>
   <div class="layout-container">
-    <!-- Bandeau principal amélioré -->
+    <!-- ✅ Bandeau principal amélioré -->
     <header class="hero-banner">
       <div class="hero-content">
-        <!-- Logo -->
-        <img 
+        <!-- ✅ Logo (s'affiche uniquement sur desktop) -->
+        <img
+           v-if="!isMobile"
           src="https://www.sunbassschool.com/wp-content/uploads/2025/02/logo-SBS-petit-noir-rond-ok.png" 
           alt="Logo SunBassSchool" 
           class="logo" 
         />
+<!-- ✅ Logo affiché uniquement en responsive si `prenom` n'existe pas -->
+<img 
+  v-if="showResponsiveLogo"
+  src="https://www.sunbassschool.com/wp-content/uploads/2025/02/logo-SBS-petit-noir-rond-ok.png" 
+  alt="Logo SunBassSchool" 
+  class="logo responsive-logo"
+/>
+        <!-- ✅ Menu Hamburger en Responsive -->
+        <div v-if="prenom">
+        <button class="menu-btn" v-if="isMobile" @click="toggleMenu">
+          <i class="bi bi-list"></i>
+        </button></div>
 
-        <!-- Bouton Installer PWA -->
+        <!-- ✅ Bouton Installer PWA -->
         <button 
           v-if="showInstallButton" 
           @click="installPWA" 
@@ -20,27 +33,20 @@
           📥
         </button>
 
-        <!-- Section centrale pour le texte -->
+        <!-- ✅ Section centrale pour le texte -->
         <div class="hero-text">
           <h1 class="hero-title">SunBassAPP</h1>
           <p class="hero-subtitle">L'école de basse en ligne qui groove !</p>
         </div>
 
-        <!-- Boutons -->
-        <div class="auth-buttons">
-          <!-- ✅ Bouton Prendre un Cours (Toujours visible) -->
-          <router-link to="/prendreuncours" class="nav-link btn-cours">
-            <i class="bi bi-play-circle"></i>
-            <span>Prendre un cours</span>
-          </router-link>
+        <!-- ✅ Boutons -->
+        <div v-if="prenom" class="auth-buttons">
+  <router-link to="/prendreuncours" class="nav-link btn-cours">
+    <i class="bi bi-play-circle"></i>
+    <span>Prendre un cours</span>
+  </router-link>
 
-          <!-- ✅ Bouton Connexion si l'utilisateur n'est pas connecté -->
-      
 
-          <!-- ✅ Bouton Déconnexion si l'utilisateur est connecté -->
-       
-
-          <!-- ✅ Bouton Mon Espace si l'utilisateur est connecté -->
           <div v-if="prenom">
             <router-link to="/mon-espace" class="nav-link mon-espace">
               <i class="bi bi-person-circle"></i>
@@ -51,103 +57,200 @@
       </div>
     </header>
 
-    <!-- Contenu principal -->
+    <!-- ✅ Overlay semi-transparent (ferme le menu au clic) -->
+    <div v-if="showMenu" class="menu-overlay" @click="toggleMenu"></div>
+
+    <!-- ✅ Menu latéral avec effet slide-in -->
+    <div class="mobile-menu" :class="{ 'active': showMenu }">
+  
+      <router-link to="/mon-espace" class="nav-link mon-espace" v-show="prenom">
+  <i class="bi bi-person-circle"></i>
+  <span>Mon Espace</span>
+</router-link>
+
+<button v-if="prenom" @click="logout" class="nav-link logout">
+  <i class="bi bi-box-arrow-right"></i> 
+  <span class="menu-text">Déconnexion</span>
+</button>
+
+</div>
+
+
+
+    <!-- ✅ Contenu principal -->
     <main class="page-content">
       <slot></slot>
     </main>
 
-    <!-- Menu de navigation en bas -->
+    <!-- ✅ Menu de navigation en bas -->
     <footer class="navbar-container">
-      <nav class="navbar">
-        <ul class="navbar-nav">
-          <li class="nav-item">
-            <router-link class="nav-link" to="/dashboard">
-              <i class="bi bi-house-door"></i>
-              <span>Accueil</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link class="nav-link" to="/partitions">
-              <i class="bi bi-music-note-beamed"></i>
-              <span>Partitions</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link class="nav-link" to="/planning">
-              <i class="bi bi-calendar-check"></i>
-              <span>Plannings</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link class="nav-link" to="/replay">
-              <i class="bi bi-play-btn"></i>
-              <span>Replay</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
-            <router-link class="nav-link" to="/videos">
-              <i class="bi bi-film"></i>
-              <span>Vidéos</span>
-            </router-link>
-          </li>
-        </ul>
-      </nav>
-    </footer>
+  <nav class="navbar">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <router-link class="nav-link" to="/dashboard">
+          <i class="bi bi-house-door"></i> <!-- ✅ Icône Accueil -->
+          <span>Home</span>
+        </router-link>
+      </li>
+      <li class="nav-item">
+        <router-link class="nav-link" to="/partitions">
+          <i class="bi bi-music-note-beamed"></i> <!-- ✅ Icône Partitions -->
+          <span>Partitions</span>
+        </router-link>
+      </li>
+      <li v-if="prenom" class="nav-item">
+  <router-link class="nav-link" to="/planning">
+    <i class="bi bi-calendar-check"></i> <!-- ✅ Icône Planning -->
+    <span>Plannings</span>
+  </router-link>
+</li>
+<li v-if="prenom" class="nav-item">
+  <router-link class="nav-link" to="/replay">
+    <i class="bi bi-play-btn"></i> <!-- ✅ Icône Replay -->
+    <span>Replay</span>
+  </router-link>
+</li>
+
+      <li class="nav-item">
+        <router-link class="nav-link" to="/videos">
+          <i class="bi bi-film"></i> <!-- ✅ Icône Vidéos -->
+          <span>Vidéos</span>
+        </router-link>
+      </li>
+    </ul>
+  </nav>
+</footer>
+
   </div>
 </template>
 
+
+
 <script>
+import { nextTick } from "vue"; // ✅ Import pour forcer l'update du DOM
+
 export default {
   name: "Layout",
   data() {
     return {
-      prenom: localStorage.getItem("prenom"),  // Récupère le prénom de l'utilisateur depuis localStorage
-      showInstallButton: false, // Affichage du bouton
-      deferredPrompt: null, // Stockage de l'événement
+      prenom: localStorage.getItem("prenom") || "", // ✅ Ajout d'une valeur par défaut
+      showMenu: false,
+      isMobile: window.innerWidth < 768,
+      showInstallButton: false,
+      deferredPrompt: null,
     };
   },
+
+  computed: {
+    showResponsiveLogo() {
+      return !this.prenom && this.isMobile;
+    }
+  },
+
   mounted() {
-  window.addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault();
-    this.deferredPrompt = event;
-    this.showInstallButton = true; // Affiche le bouton si possible
-  });
-  {
-  console.log("Prénom récupéré:", this.prenom);
-};
-},
-
-
-  
-
+    window.addEventListener("resize", this.checkMobile);
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      this.deferredPrompt = event;
+      this.showInstallButton = true;
+    });
+  },
+  beforeUnmount() {
+    window.removeEventListener("resize", this.checkMobile);
+  },
   methods: {
+    toggleMenu() {
+      this.showMenu = !this.showMenu;
+      
+      nextTick(() => {
+        console.log("Menu ouvert :", this.showMenu); // ✅ Debug pour voir si l'état change
+        const menu = document.querySelector(".mobile-menu");
+        if (menu) {
+          menu.classList.toggle("active", this.showMenu);
+        }
+      });
+    },
+    checkMobile() {
+      this.isMobile = window.innerWidth < 768;
+    },
     logout() {
+  // Récupérer l'email de localStorage si ce n'est pas déjà défini
+  const email = this.email || localStorage.getItem("email");
+
+  // Log pour signaler le début de la déconnexion
+  console.log("Déconnexion en cours...");
+  
+  // Effacer les éléments stockés dans localStorage
+  console.log("Suppression des éléments dans localStorage...");
   localStorage.removeItem("prenom");
   localStorage.removeItem("email");
 
-  this.prenom = null; // Met à jour l'état local
+  // Log pour signaler que les éléments de l'utilisateur sont supprimés
+  console.log("Données utilisateur supprimées de localStorage.");
 
-  this.$router.push("/login");
-}
-,
-installPWA() {
-    if (this.deferredPrompt) {
-      this.deferredPrompt.prompt();
-      this.deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === "accepted") {
-          console.log("L'utilisateur a installé la PWA");
-        } else {
-          console.log("L'utilisateur a refusé l'installation");
-        }
-        this.deferredPrompt = null;
-        this.showInstallButton = false;
-      });
-    }
+  // Vérifier si l'email est défini avant de supprimer les données du cache
+  if (email) {
+    const cacheKey = `studentData_${email}`;
+    const cacheExpirationKey = `${cacheKey}_expiration`;
+    console.log(`Suppression du cache pour ${cacheKey} et ${cacheExpirationKey}`);
+    localStorage.removeItem(cacheKey); // Supprime les données utilisateur mises en cache
+    localStorage.removeItem(cacheExpirationKey); // Supprime la clé d'expiration du cache
+  } else {
+    console.warn("Aucun email trouvé, impossible de supprimer les données du cache.");
   }
 
+  this.prenom = null;
+
+  // Effacer les éléments dans sessionStorage si nécessaire
+  console.log("Effacement de sessionStorage...");
+  sessionStorage.clear();
+
+  // Supprimer le cache de la PWA
+  if ('caches' in window) {
+    caches.keys().then((cacheNames) => {
+      cacheNames.forEach((cacheName) => {
+        if (cacheName.startsWith('sunbassschool')) {  // Cibler les caches de votre application
+          console.log(`Suppression du cache ${cacheName}`);
+          caches.delete(cacheName).then(() => {
+            console.log(`Cache ${cacheName} supprimé`);
+          });
+        }
+      });
+    });
+  }
+
+  // Réinitialiser le service worker (optionnel, si vous utilisez un service worker)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then((registration) => {
+      console.log("Mise à jour du service worker...");
+      registration.update();  // Mettre à jour le service worker pour forcer la mise à jour des ressources en cache
+    });
+  }
+
+  // Log pour signaler la redirection
+  console.log("Redirection vers la page de login...");
+  // Rediriger vers la page de login
+  this.$router.push("/login");
+},
+
+
+
+
+    installPWA() {
+      if (this.deferredPrompt) {
+        this.deferredPrompt.prompt();
+        this.deferredPrompt.userChoice.then((choiceResult) => {
+          this.deferredPrompt = null;
+          this.showInstallButton = false;
+        });
+      }
+    },
   },
 };
 </script>
+
+
+
 
 <style scoped>
 /* ✅ CONTAINER PRINCIPAL */
@@ -198,7 +301,6 @@ installPWA() {
 .hero-title {
   font-family: "Poppins", sans-serif;
   font-size: 1.8rem;
-  margin-left:%;
   width:100%;
   text-align: center;
   color: white;
@@ -327,8 +429,71 @@ installPWA() {
   color: #f1c40f;
 }
 
+/* ✅ MENU RESPONSIVE */
+/* ✅ Overlay semi-transparent quand le menu est ouvert */
+.menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+}
+
+/* ✅ Menu latéral qui arrive depuis la gauche */
+.mobile-menu {
+  position: fixed;
+  top: 75px; /* Juste sous le header */
+  left: -40%; /* Caché en dehors de l'écran */
+  width: 38%;
+  height: calc(100% - 75px);
+  background: #000000;
+  display: flex;
+  opacity: 88%;
+  text-align: center;
+  flex-direction: column;
+  padding: 15px;
+  box-shadow: 4px 0px 10px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease-in-out; /* ✅ Animation fluide */
+  z-index: 999;
+}
+.mobile-menu a:not(:last-child),
+.mobile-menu .nav-link:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3); /* Ligne séparatrice */
+  padding-bottom: 8px; /* Espacement */
+  margin-bottom: 8px;
+}
+
+/* ✅ Quand le menu est actif, il glisse à gauche */
+.mobile-menu.active {
+  text-align: center;
+  transform: translateX(100%); /* ✅ Slide depuis la gauche */
+}
 
 
+/* ✅ Style des liens dans le menu */
+.mobile-menu .nav-link {
+  display: flex;
+  align-items: center;  /* ✅ Alignement vertical */
+  gap: 10px;  /* ✅ Espace entre l'icône et le texte */
+  padding: 12px 15px;
+  color: white;
+  font-size: 16px;
+  text-decoration: none;
+  transition: all 0.3s ease-in-out;
+  white-space: nowrap; /* ✅ Empêche le retour à la ligne */
+}
+
+.mobile-menu .nav-link i {
+  font-size: 20px; /* ✅ Taille des icônes */
+  margin-right: 0px; /* ✅ Ajout d'espace entre l'icône et le texte */
+}
+
+.mobile-menu .nav-link:hover {
+  background: #f1c40f;
+  color: black;
+}
 
 
 
@@ -354,13 +519,25 @@ installPWA() {
     width: 100%;
   }
 
+  
   .logo {
-    height: 80px;
-    width: auto;
-    margin-left: 0;
-    padding: 0;
-    flex-shrink: 0; /* ✅ Empêche le logo de rétrécir */
+    margin-left:0%;
   }
+
+
+/* ✅ Bouton du menu hamburger */
+.menu-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: white;
+  margin-right: 15px;
+}
+
+.menu-btn:hover {
+  color: #f1c40f;
+}
 
   .hero-text {
     flex-grow: 1; /* ✅ Prend l’espace restant */
