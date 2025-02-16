@@ -54,13 +54,14 @@ export default {
   components: { Layout },
   data() {
     return {
-      email: localStorage.getItem("email") || "",  // ✅ Récupération dès le début
-      prenom: localStorage.getItem("prenom") || "",  // ✅ Récupération dès le début
+      email: localStorage.getItem("email") || "",  
+      prenom: localStorage.getItem("prenom") || "",  
       password: "",
       message: "",
       messageType: "",
-      sheetURL: "https://script.google.com/macros/s/AKfycbxdNpikgr_fqKaiDSTDvYA2FomdGZJqObFB-8ApYJIiBLFEcclMA9i3SbNfVoS_HpC3/exec?route=login",
-      updateURL: "https://thingproxy.freeboard.io/fetch/https://script.google.com/macros/s/AKfycbxdNpikgr_fqKaiDSTDvYA2FomdGZJqObFB-8ApYJIiBLFEcclMA9i3SbNfVoS_HpC3/exec?route=login"
+      jwt: localStorage.getItem("jwt") || "",  
+      refreshjwt: localStorage.getItem("refreshjwt") || "",
+      apiBaseURL: "https://cors-anywhere.herokuapp.com/https://script.google.com/macros/s/AKfycbze7GQsS-5ptUUTwAcjry5mLOzKVDbaEJ_fkr0jBVM45ab9UafMtcTUtwkEKp0HHVh5mg/exec"
     };
   },
   mounted() {
@@ -68,7 +69,6 @@ export default {
     console.log("LocalStorage - prenom:", localStorage.getItem("prenom"));
     console.log("LocalStorage - email:", localStorage.getItem("email"));
   },
-
   watch: {
     email(newEmail, oldEmail) {
       if (newEmail && newEmail !== oldEmail) {
@@ -81,99 +81,126 @@ export default {
       }
     }
   },
-
   methods: {
-    async sha256(text) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(text);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-    },
+  async sha256(text) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+  },
 
-    async login() {
-      if (!this.email || !this.password) {
-        this.message = "Veuillez remplir tous les champs.";
-        this.messageType = "alert-danger";
-        return;
+  async login() {
+  if (!this.email || !this.password) {
+    this.message = "Veuillez remplir tous les champs.";
+    this.messageType = "alert-danger";
+    return;
+  }
+
+  const hashedPassword = await this.sha256(this.password);
+
+  try {
+    console.log("📡 Envoi de la requête de connexion...");
+    const response = await fetch(`${this.apiBaseURL}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      body: JSON.stringify({
+        route: "login",  // Spécifie que la route est "login"
+        email: this.email,
+        password: hashedPassword  // Envoie le mot de passe haché pour plus de sécurité
+      })
+    });
+
+    const data = await response.json();
+    console.log("🔍 Réponse API :", data);
+
+    if (data.status === 'error') {
+      this.message = `❌ ${data.message}`;
+      this.messageType = "alert-danger";
+      return;
+    }
+
+    // ✅ Stockage des tokens dans localStorage
+    localStorage.setItem("jwt", data.data.jwt);  // Stocke le JWT
+    localStorage.setItem("refreshjwt", data.data.refreshToken);  // Stocke le refreshToken
+    this.jwt = data.data.jwt;
+    this.refreshjwt = data.data.refreshToken;
+
+    // ✅ Stocke aussi les infos utilisateur
+    this.prenom = data.data.prenom || "Utilisateur";
+    this.email = data.data.email;
+
+    localStorage.setItem("prenom", this.prenom);
+    localStorage.setItem("email", this.email);
+
+    this.message = "✅ Connexion réussie";
+    this.messageType = "alert-success";
+
+    // 🔥 Récupération des infos utilisateur
+    await this.fetchUserInfo();  // Si nécessaire, cette méthode peut être adaptée pour afficher des infos supplémentaires
+
+  } catch (error) {
+    console.error("🚨 Erreur lors de la connexion :", error);
+    this.message = `Erreur de connexion : ${error.message}`;
+    this.messageType = "alert-danger";
+  }
+},
+
+async fetchUserInfo() {
+  try {
+    console.log("📡 Récupération des infos utilisateur...");
+    const response = await fetch(`${this.apiBaseURL}?route=getUser&jwt=${this.jwt}`, {
+      headers: {
+        "X-Requested-With": "XMLHttpRequest"
       }
+    });
 
-      const hashedPassword = await this.sha256(this.password);
+    if (!response.ok) throw new Error("Erreur lors de la récupération des données");
 
-      try {
-        console.log("📡 Envoi de la requête pour récupérer les utilisateurs...");
-        const response = await fetch(this.sheetURL);
+    const userInfo = await response.json();
+    console.log("👤 Infos utilisateur :", userInfo);
 
-        if (!response.ok) {
-          const errorText = await response.text(); // Récupérer le message d'erreur du serveur
-          throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
-        }
+    // Stocke les informations récupérées
+    this.prenom = userInfo.data.prenom || "";
+    this.email = userInfo.data.email || "";
 
-        const users = await response.json();
-        console.log("🔍 Données récupérées :", users);
+    localStorage.setItem("prenom", this.prenom);
+    localStorage.setItem("email", this.email);
 
-        if (!Array.isArray(users)) {
-          throw new Error("Données inattendues : la réponse n'est pas un tableau.");
-        }
+    this.message = "✅ Connexion réussie";
+    this.messageType = "alert-success";
 
-        // Vérifier la présence des champs avant de faire un .trim()
-        const user = users.find(user =>
-          user.email?.trim() === this.email.trim() &&
-          user.hashedCode?.trim() === hashedPassword
-        );
+    // 🔥 Redirection après connexion
+    this.$router.push('/dashboard');
 
-        if (!user) {
-          console.error("❌ Aucun utilisateur trouvé avec cet email et ce mot de passe !");
-          this.message = "❌ Identification échouée";
-          this.messageType = "alert-danger";
-          return;
-        }
+  } catch (error) {
+    console.error("🚨 Erreur lors de la récupération des infos utilisateur :", error);
+    this.message = "Erreur lors de la récupération des infos utilisateur.";
+    this.messageType = "alert-danger";
+    }
+  },
 
-        // ✅ Stockage dans localStorage et mise à jour immédiate
-        localStorage.setItem("prenom", user.prenom?.trim() || "");
-        localStorage.setItem("email", user.email?.trim() || "");
+  logout() {
+    localStorage.removeItem("jwt");
+    localStorage.removeItem("refreshjwt");
+    localStorage.removeItem("prenom");
+    localStorage.removeItem("email");
 
-        this.prenom = user.prenom?.trim() || "";
-        this.email = user.email?.trim() || "";
+    this.jwt = "";
+    this.refreshjwt = "";
+    this.prenom = "";
+    this.email = "";
 
-        this.message = "✅ Identifiant OK";
-        this.messageType = "alert-success";
-
-        // 🔥 Mise à jour de la dernière connexion
-        await fetch(this.updateURL, {
-          method: "POST",
-          mode: "cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: this.email, hashedPassword })
-        });
-
-        // ✅ Sécurisation de la redirection
-        if (this.$router) {
-          this.$router.push('/dashboard');
-        } else {
-          console.warn("🚨 Redirection échouée : Vue Router non disponible !");
-        }
-
-      } catch (error) {
-        console.error("🚨 Erreur lors de la récupération des utilisateurs :", error);
-        this.message = `Erreur de connexion : ${error.message}`;
-        this.messageType = "alert-danger";
-      }
-    },
-
-    logout() {
-      localStorage.removeItem("prenom");
-      localStorage.removeItem("email");
-
-      this.prenom = "";
-      this.email = "";
-
-      this.message = "Vous êtes déconnecté.";
-      this.messageType = "alert-info";
+    this.message = "Vous êtes déconnecté.";
+    this.messageType = "alert-info";
     }
   }
 };
 </script>
+
 
 
 <style scoped>
