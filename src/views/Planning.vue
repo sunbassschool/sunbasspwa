@@ -1,9 +1,8 @@
 <template>
   <Layout>
     <div class="container-xxl mt-4">
-
       <!-- ✅ Affichage uniquement si l'utilisateur est connecté -->
-      <div v-if="!errorMessage">
+      <div v-if="isLoggedIn">
         <h2 class="text-center mb-3">📅 Planning des Cours</h2>
         <p class="text-muted text-center">Clique sur une ligne pour rejoindre ton cours.</p>
       </div>
@@ -15,26 +14,28 @@
       </div>
 
       <!-- ✅ Message si l'utilisateur n'est pas connecté -->
-      <div v-if="!loading && errorMessage" class="alert alert-info text-center mt-3">
+      <div v-if="!loading && !isLoggedIn" class="alert alert-info text-center mt-3">
         <h4 class="fw-bold">🎸 Rejoins SunBassSchool et commence ton apprentissage !</h4>
         <p class="mb-3">
           Il semble que tu n’es pas encore connecté. Pour accéder à ton planning et réserver tes cours de basse, 
           connecte-toi ou crée un compte dès maintenant !
         </p>
         <div class="d-flex justify-content-center gap-3">
-          <a href="/login" class="btn btn-primary">Se connecter</a>
-          <a href="/Registerform" class="btn btn-success">S'inscrire</a>
+          <router-link to="/login" class="btn btn-primary">Se connecter</router-link>
+          <router-link to="/Registerform" class="btn btn-success">S'inscrire</router-link>
         </div>
       </div>
 
       <!-- ✅ Message si aucun cours trouvé, mais seulement après le chargement -->
-      <div v-if="!loading && planningData.length === 0 && !errorMessage" class="alert alert-warning text-center mt-3">
+      <div v-if="!loading && planningData.length === 0 && isLoggedIn" class="alert alert-warning text-center mt-3">
         Aucun cours trouvé pour ton compte.
       </div>
 
       <!-- ✅ Tableau des cours, affiché uniquement après le chargement -->
       <div v-if="!loading && planningData.length > 0" class="table-responsive mt-3">
-        <table class="table table-hover shadow-sm">
+        <table class="table table-hover shadow-sm" style="font-size: 1rem;">
+
+
           <thead class="table-dark">
             <tr>
               <th scope="col">📆 Date & Heure</th>
@@ -56,30 +57,38 @@
 <script>
 import Layout from "../views/Layout.vue";
 import axios from "axios";
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { jwtDecode } from "jwt-decode"; // 📌 Décodage du JWT
 
 export default {
   name: "Planning",
-  components: {
-    Layout,
-  },
+  components: { Layout },
   setup() {
     const planningData = ref([]);
     const loading = ref(true);
-    const errorMessage = ref("");
 
     const API_URL = "https://script.google.com/macros/s/AKfycbzGV13_iuC5shxErpbzwJoRBLGPHsH5osBvw0K2M_xh_TsJx9P0Fq1A0_1S4XDd0AW3nA/exec";
+    const cacheDuration = 5 * 60 * 1000; // 5 minutes
 
-    // Récupération du prénom et de l'email à chaque appel
-    const getUserInfo = () => {
-      return {
-        prenom: localStorage.getItem("prenom"),
-        email: localStorage.getItem("email"),
-      };
-    };
+    // ✅ Vérifie si l'utilisateur est connecté
+    const isLoggedIn = computed(() => {
+      const jwt = sessionStorage.getItem("jwt");
+      if (!jwt) return false;
 
-    const cacheDuration = 5 * 60 * 1000;
+      try {
+        const decoded = jwtDecode(jwt);
+        return decoded.exp * 1000 > Date.now();
+      } catch (error) {
+        console.error("🚨 JWT invalide :", error);
+        return false;
+      }
+    });
 
+    // ✅ Récupère l'email depuis le JWT
+    const email = computed(() => sessionStorage.getItem("email") || "");
+    const prenom = computed(() => sessionStorage.getItem("prenom") || "");
+
+    // ✅ Formatte la date pour l'affichage
     const formatDate = (rawDate) => {
       if (!rawDate) return "Date invalide";
 
@@ -102,73 +111,67 @@ export default {
     };
 
     const fetchPlanningData = async () => {
-      const { prenom, email } = getUserInfo(); // Récupération des infos utilisateur
-
-      if (!prenom || !email) {
-        errorMessage.value = "🎸 **Rejoins SunBassSchool et commence ton apprentissage !**\nIl semble que tu n’es pas encore connecté. Pour accéder à ton planning et réserver tes cours de basse, connecte-toi ou crée un compte dès maintenant !\n👉 [Se connecter](#) | [S'inscrire](#)";
-        loading.value = false;
-        return;
-      }
-
-      const cacheKey = `planning_${email}_${prenom}`;
-      const cacheTimestampKey = `${cacheKey}_timestamp`;
-      const cachedData = localStorage.getItem(cacheKey);
-      const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
-
-      const cacheExpired = !cacheTimestamp || (Date.now() - cacheTimestamp > cacheDuration);
-
-      if (cachedData && !cacheExpired) {
-  try {
-    const parsedData = JSON.parse(cachedData);
-    if (!Array.isArray(parsedData) || parsedData.length === 0) {
-      throw new Error("Cache corrompu, suppression...");
-    }
-    console.log("⚡ Chargement du planning depuis le cache");
-    planningData.value = parsedData;
+  if (!isLoggedIn.value) {
     loading.value = false;
     return;
-  } catch (error) {
-    console.warn(error.message);
+  }
+
+  const cacheKey = `planning_${email.value}_${prenom.value}`;
+  const cacheTimestampKey = `${cacheKey}_timestamp`;
+  const cachedData = localStorage.getItem(cacheKey);
+  const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
+  const cacheExpired = !cacheTimestamp || Date.now() - cacheTimestamp > cacheDuration;
+
+  if (cachedData && !cacheExpired) {
+    try {
+      const parsedData = JSON.parse(cachedData);
+      
+      // Validation supplémentaire de la structure des données
+      if (!Array.isArray(parsedData) || parsedData.length === 0 || !parsedData.every(item => item.date && item.meet)) {
+        throw new Error("Cache corrompu, suppression...");
+      }
+
+      console.log("⚡ Chargement du planning depuis le cache");
+      planningData.value = parsedData;
+      loading.value = false;
+      return;
+    } catch (error) {
+      console.warn(error.message);
+      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(cacheTimestampKey);
+    }
+  }
+
+  if (cacheExpired) {
+    console.log("🔄 Cache expiré, récupération des nouvelles données...");
     localStorage.removeItem(cacheKey);
     localStorage.removeItem(cacheTimestampKey);
   }
-}
 
-      if (cacheExpired) {
-        console.log("🔄 Cache expiré, récupération des nouvelles données...");
-        localStorage.removeItem(cacheKey);
-        localStorage.removeItem(cacheTimestampKey);
-      }
+  try {
+    console.log("🌐 Requête envoyée :", `${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
+    const response = await axios.get(`${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
 
-      try {
-        console.log(
-          "🌐 Requête envoyée :",
-          `${API_URL}?route=planning&email=${encodeURIComponent(email)}&prenom=${encodeURIComponent(prenom)}`
-        );
-        const response = await axios.get(
-          `${API_URL}?route=planning&email=${encodeURIComponent(email)}&prenom=${encodeURIComponent(prenom)}`
-        );
+    console.log("✅ Données reçues :", response.data);
 
-        console.log("✅ Données reçues :", response.data);
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      planningData.value = response.data.map((item) => ({
+        date: item.date,
+        formattedDate: item.date ? formatDate(item.date) : "Date invalide",
+        meet: item.meet,
+      }));
 
-        if (Array.isArray(response.data) && response.data.length > 0) {
-          planningData.value = response.data.map((item) => ({
-            date: item.date,
-            formattedDate: item.date ? formatDate(item.date) : "Date invalide",
-            meet: item.meet,
-          }));
-
-          localStorage.setItem(cacheKey, JSON.stringify(planningData.value));
-          localStorage.setItem(cacheTimestampKey, Date.now());
-        } else {
-          errorMessage.value = "Aucun cours trouvé.";
-          planningData.value = [];
-        }
-      } catch (error) {
-        console.error("❌ Erreur lors du chargement des cours :", error);
-        errorMessage.value = "Erreur de chargement des cours.";
-      } finally {
-        loading.value = false;
+      localStorage.setItem(cacheKey, JSON.stringify(planningData.value));
+      localStorage.setItem(cacheTimestampKey, Date.now());
+    } else {
+      console.error("❌ Les données récupérées sont invalides");
+      alert("Erreur lors du chargement des cours.");
+    }
+  } catch (error) {
+    console.error("❌ Erreur lors du chargement des cours :", error);
+    alert("Une erreur est survenue lors du chargement de ton planning.");
+  } finally {
+    loading.value = false;
       }
     };
 
@@ -180,10 +183,11 @@ export default {
 
     onMounted(fetchPlanningData);
 
-    return { planningData, loading, errorMessage, openMeet };
+    return { planningData, loading, isLoggedIn, openMeet };
   },
 };
 </script>
+
 
 
 

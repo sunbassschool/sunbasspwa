@@ -33,7 +33,8 @@
             <i :class="card.icon" class="icon me-3"></i>
             <div>
               <h3 class="h5 mb-1">{{ card.title }}</h3>
-              <p class="text-muted mb-0">{{ card.text }}</p>
+              <p class="text-muted mb-0" v-html="card.text"></p>
+
             </div>
           </div>
           <div v-if="index < cards.length - 1" class="separator"></div>
@@ -44,113 +45,136 @@
   </Layout>
 </template>
 
-
 <script>
 import Layout from "../views/Layout.vue";
-import axios from "axios"; // Pour récupérer les données API
+import { jwtDecode } from "jwt-decode"; // 📌 Ajout du décodage du JWT
 
 export default {
   name: "Home",
-  components: {
-    Layout,
-  },
+  components: { Layout },
   data() {
     return {
       cards: [],
-      nomEleve: "",
-      objectif: "",
-      prochainCours: "",
-      isLoggedIn: false, // L'élève n'est pas connecté par défaut
       isLoading: true, // 🚀 Ajout du spinner au chargement
-      cacheDuration: 5 * 60 * 1000, // ⏳ Durée du cache : 5 minutes (en millisecondes)
+      cacheDuration: 5 * 60 * 1000, // ⏳ Durée du cache : 5 minutes
     };
   },
-  mounted() {
-    const email = localStorage.getItem("email");
-    const prenom = localStorage.getItem("prenom");
+  computed: {
+    isLoggedIn() {
+      const jwt = sessionStorage.getItem("jwt");
+      if (!jwt) return false;
 
-    if (email && prenom) {
-      this.isLoggedIn = true;
-      this.fetchStudentData(email, prenom);
+      try {
+        const decoded = jwtDecode(jwt);
+        return decoded.exp * 1000 > Date.now(); // 🔥 Vérifie si le JWT est expiré
+      } catch (error) {
+        console.error("🚨 JWT invalide :", error);
+        return false;
+      }
+    },
+    email() {
+      return sessionStorage.getItem("email") || "";
+    },
+    prenom() {
+      return sessionStorage.getItem("prenom") || "";
+    }
+  },
+  mounted() {
+    console.log("✅ Vérification du JWT au chargement...");
+    if (this.isLoggedIn) {
+      this.fetchStudentData();
     } else {
-      this.isLoading = false; // 🚀 Désactive le spinner si pas connecté
+      this.isLoading = false;
     }
   },
   methods: {
-    async fetchStudentData(email, prenom) {
-      const cacheKey = `planning_${email}_${prenom}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
+  async fetchStudentData() {
+    const cacheKey = `planning_${this.email}_${this.prenom}`;
+    const cachedData = localStorage.getItem(cacheKey);
+    const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
 
-      if (cachedData && cacheTimestamp && Date.now() - cacheTimestamp < this.cacheDuration) {
-        console.log("⚡ Chargement des données depuis le cache");
-        this.updateData(JSON.parse(cachedData));
-        this.isLoading = false; // ✅ Désactive le spinner après chargement
-        return;
-      }
+    // Vérifie si le cache existe et est valide
+    if (cachedData && cacheTimestamp && Date.now() - cacheTimestamp < this.cacheDuration) {
+      console.log("⚡ Chargement des données depuis le cache");
 
       try {
-        console.log("🌐 Récupération des données depuis l'API...");
-        const response = await axios.get("https://script.google.com/macros/s/AKfycbyONssEhZB8DzTkDij1hwvUXVdNSCe3JnqjAs88hCVC1-oNHSS9cPthQGA0ZJaNVlrZfA/exec", {
-          params: { route: "planning", email, prenom },
-        });
-
-        const data = response.data;
-        localStorage.setItem(cacheKey, JSON.stringify(data));
-        localStorage.setItem(`${cacheKey}_timestamp`, Date.now());
-
-        this.updateData(data);
+        const parsedData = JSON.parse(cachedData);
+        
+        // Vérifie l'intégrité des données
+        if (this.isCacheValid(parsedData)) {
+          this.updateData(parsedData);
+          this.isLoading = false;
+          return;
+        } else {
+          console.log("⚠️ Cache corrompu détecté. Récupération des données depuis l'API...");
+        }
       } catch (error) {
-        console.error("❌ Erreur lors de la récupération des données : ", error);
-        this.displayError();
+        console.error("❌ Erreur lors du parsing du cache : ", error);
+        console.log("⚠️ Cache corrompu détecté. Récupération des données depuis l'API...");
       }
+    }
 
-      this.isLoading = false; // ✅ Désactive le spinner après la requête
-    },
+    // Si les données sont manquantes ou corrompues, on appelle l'API
+    try {
+      console.log("🌐 Récupération des données depuis l'API...");
+      const response = await fetch(`https://script.google.com/macros/s/AKfycbyONssEhZB8DzTkDij1hwvUXVdNSCe3JnqjAs88hCVC1-oNHSS9cPthQGA0ZJaNVlrZfA/exec?route=planning&email=${this.email}&prenom=${this.prenom}`);
+      const data = await response.json();
 
-    updateData(data) {
-      this.nomEleve = data.nom || "Nom inconnu";
-      this.objectif = data.objectif || "Aucun objectif défini";
-      this.prochainCours = data.prochainCours ? `${data.prochainCours.date} - ${data.prochainCours.cours}` : "Pas de cours prévu.";
+      // Sauvegarde les nouvelles données dans le cache
+      localStorage.setItem(cacheKey, JSON.stringify(data));
+      localStorage.setItem(`${cacheKey}_timestamp`, Date.now());
 
-      this.cards = [
-        {
-          icon: "bi bi-calendar-event",
-          title: "Prochain Cours",
-          text: this.prochainCours,
-        },
-        {
-          icon: "bi bi-flag",
-          title: "Objectif actuel",
-          text: `Ton objectif : ${this.objectif}`,
-        },
-      ];
-    },
+      this.updateData(data);
+    } catch (error) {
+      console.error("❌ Erreur lors de la récupération des données : ", error);
+      this.displayError();
+    }
 
-    displayError() {
-      this.cards = [
-        {
-          icon: "bi bi-calendar-event",
-          title: "Prochain Cours",
-          text: "Impossible de récupérer les données du prochain cours.",
-        },
-        {
-          icon: "bi bi-flag",
-          title: "Objectif actuel",
-          text: "Impossible de récupérer l'objectif de l'élève.",
-        },
-      ];
+    this.isLoading = false;
+  },
+
+  // Fonction de validation du cache
+  isCacheValid(data) {
+    // Vérifie si les propriétés attendues existent et sont dans le bon format
+    return data && data.prochainCours && data.prochainCours.date && data.prochainCours.cours;
+  },
+
+  updateData(data) {
+    const prochainCours = data.prochainCours
+      ? `${data.prochainCours.date} - ${data.prochainCours.cours} <a href="${data.prochainCours.meet}" target="_blank">Lien Meet</a>`
+      : "Pas de cours prévu.";
+
+    this.cards = [
+      { 
+        icon: "bi bi-calendar-event", 
+        title: "Prochain Cours", 
+        text: prochainCours 
+      },
+      { 
+        icon: "bi bi-flag", 
+        title: "Objectif actuel", 
+        text: `Ton objectif : ${data.objectif || "Aucun objectif défini"}` 
+      }
+    ];
+  },
+
+  displayError() {
+    this.cards = [
+      { icon: "bi bi-calendar-event", title: "Prochain Cours", text: "Impossible de récupérer les données du prochain cours." },
+      { icon: "bi bi-flag", title: "Objectif actuel", text: "Impossible de récupérer l'objectif de l'élève." },
+    ];
     },
 
     redirectToRegisterform() {
-      this.$router.push("/Registerform");
+      this.$router.push("/registerform");
     },
     redirectToLogin() {
-      this.$router.push("/login"); // ✅ Utilise Vue Router
-    },
-  },
+      this.$router.push("/login");
+    }
+  }
 };
 </script>
+
 
 
 

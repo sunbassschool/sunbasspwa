@@ -1,81 +1,58 @@
 <template>
   <div class="layout-container">
-    <!-- ✅ Bandeau principal amélioré -->
+    <!-- ✅ Bandeau principal -->
     <header class="hero-banner">
       <div class="hero-content">
-        <!-- ✅ Logo (s'affiche uniquement sur desktop) -->
-        <img
-           v-if="!isMobile"
-          src="https://www.sunbassschool.com/wp-content/uploads/2025/02/logo-SBS-petit-noir-rond-ok.png" 
-          alt="Logo SunBassSchool" 
-          class="logo" 
-        />
-<!-- ✅ Logo affiché uniquement en responsive si `prenom` n'existe pas -->
-<img 
-  v-if="showResponsiveLogo"
-  src="https://www.sunbassschool.com/wp-content/uploads/2025/02/logo-SBS-petit-noir-rond-ok.png" 
-  alt="Logo SunBassSchool" 
-  class="logo responsive-logo"
-/>
+        <!-- ✅ Logo pour Desktop -->
+        <img v-if="!isMobile" src="https://www.sunbassschool.com/wp-content/uploads/2025/02/logo-SBS-petit-noir-rond-ok.png" alt="Logo SunBassSchool" class="logo" />
+
+        <!-- ✅ Logo Responsive si l'utilisateur n'est pas connecté -->
+        <img v-if="showResponsiveLogo" src="https://www.sunbassschool.com/wp-content/uploads/2025/02/logo-SBS-petit-noir-rond-ok.png" alt="Logo SunBassSchool" class="logo responsive-logo" />
+
         <!-- ✅ Menu Hamburger en Responsive -->
-        <div v-if="prenom">
-        <button class="menu-btn" v-if="isMobile" @click="toggleMenu">
+        <button class="menu-btn" v-if="isMobile && isLoggedIn && prenom" @click="toggleMenu">
           <i class="bi bi-list"></i>
-        </button></div>
+        </button>
 
         <!-- ✅ Bouton Installer PWA -->
-        <button 
-          v-if="showInstallButton" 
-          @click="installPWA" 
-          class="install-btn" 
-          title="Installer SunBassAPP"
-        >
+        <button v-if="showInstallButton" @click="installPWA" class="install-btn" title="Installer SunBassAPP">
           📥
         </button>
 
-        <!-- ✅ Section centrale pour le texte -->
+        <!-- ✅ Section centrale -->
         <div class="hero-text">
           <h1 class="hero-title">SunBassAPP</h1>
           <p class="hero-subtitle">L'école de basse en ligne qui groove !</p>
         </div>
 
-        <!-- ✅ Boutons -->
-        <div v-if="prenom" class="auth-buttons">
-  <router-link to="/prendreuncours" class="nav-link btn-cours">
-    <i class="bi bi-play-circle"></i>
-    <span>Prendre un cours</span>
-  </router-link>
+        <!-- ✅ Boutons uniquement si connecté -->
+        <div v-if="isLoggedIn && prenom" class="auth-buttons">
+          <router-link to="/prendreuncours" class="nav-link btn-cours">
+            <i class="bi bi-play-circle"></i>
+            <span>Prendre un cours</span>
+          </router-link>
 
-
-          <div v-if="prenom">
-            <router-link to="/mon-espace" class="nav-link mon-espace">
-              <i class="bi bi-person-circle"></i>
-              <span>Mon Espace</span>
-            </router-link>
-          </div>
+          <router-link to="/mon-espace" class="nav-link mon-espace">
+            <i class="bi bi-person-circle"></i>
+            <span>Mon Espace</span>
+          </router-link>
         </div>
       </div>
     </header>
 
-    <!-- ✅ Overlay semi-transparent (ferme le menu au clic) -->
+    <!-- ✅ Menu latéral -->
     <div v-if="showMenu" class="menu-overlay" @click="toggleMenu"></div>
-
-    <!-- ✅ Menu latéral avec effet slide-in -->
     <div class="mobile-menu" :class="{ 'active': showMenu }">
-  
-      <router-link to="/mon-espace" class="nav-link mon-espace" v-show="prenom">
-  <i class="bi bi-person-circle"></i>
-  <span>Mon Espace</span>
-</router-link>
+      <router-link to="/mon-espace" class="nav-link mon-espace" v-if="isLoggedIn && prenom">
+        <i class="bi bi-person-circle"></i>
+        <span>Mon Espace</span>
+      </router-link>
 
-<button v-if="prenom" @click="logout" class="nav-link logout">
-  <i class="bi bi-box-arrow-right"></i> 
-  <span class="menu-text">Déconnexion</span>
-</button>
-
-</div>
-
-
+      <button v-if="isLoggedIn" @click="logout" class="nav-link logout">
+        <i class="bi bi-box-arrow-right"></i> 
+        <span>Déconnexion</span>
+      </button>
+    </div>
 
     <!-- ✅ Contenu principal -->
     <main class="page-content">
@@ -84,69 +61,93 @@
 
     <!-- ✅ Menu de navigation en bas -->
     <footer class="navbar-container">
-  <nav class="navbar">
-    <ul class="navbar-nav">
-      <li class="nav-item">
-        <router-link class="nav-link" to="/dashboard">
-          <i class="bi bi-house-door"></i> <!-- ✅ Icône Accueil -->
-          <span>Home</span>
-        </router-link>
-      </li>
-      <li class="nav-item">
-        <router-link class="nav-link" to="/partitions">
-          <i class="bi bi-music-note-beamed"></i> <!-- ✅ Icône Partitions -->
-          <span>Partitions</span>
-        </router-link>
-      </li>
-      <li v-if="prenom" class="nav-item">
-  <router-link class="nav-link" to="/planning">
-    <i class="bi bi-calendar-check"></i> <!-- ✅ Icône Planning -->
-    <span>Plannings</span>
-  </router-link>
-</li>
-<li v-if="prenom" class="nav-item">
-  <router-link class="nav-link" to="/replay">
-    <i class="bi bi-play-btn"></i> <!-- ✅ Icône Replay -->
-    <span>Replay</span>
-  </router-link>
-</li>
+      <nav class="navbar">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <router-link class="nav-link" to="/dashboard">
+              <i class="bi bi-house-door"></i>
+              <span>Home</span>
+            </router-link>
+          </li>
+          <li class="nav-item">
+            <router-link class="nav-link" to="/partitions">
+              <i class="bi bi-music-note-beamed"></i>
+              <span>Partitions</span>
+            </router-link>
+          </li>
 
-      <li class="nav-item">
-        <router-link class="nav-link" to="/videos">
-          <i class="bi bi-film"></i> <!-- ✅ Icône Vidéos -->
-          <span>Vidéos</span>
-        </router-link>
-      </li>
-    </ul>
-  </nav>
-</footer>
+          <!-- ✅ Planning et Replay uniquement si connecté -->
+          <li v-if="isLoggedIn && prenom" class="nav-item">
+            <router-link class="nav-link" to="/planning">
+              <i class="bi bi-calendar-check"></i>
+              <span>Plannings</span>
+            </router-link>
+          </li>
+          <li v-if="isLoggedIn && prenom" class="nav-item">
+            <router-link class="nav-link" to="/replay">
+              <i class="bi bi-play-btn"></i>
+              <span>Replay</span>
+            </router-link>
+          </li>
 
+          <li class="nav-item">
+            <router-link class="nav-link" to="/videos">
+              <i class="bi bi-film"></i>
+              <span>Vidéos</span>
+            </router-link>
+          </li>
+        </ul>
+      </nav>
+    </footer>
   </div>
 </template>
 
 
 
+
 <script>
-import { nextTick } from "vue"; // ✅ Import pour forcer l'update du DOM
+import { jwtDecode } from "jwt-decode";
+import { nextTick } from "vue";
 
 export default {
   name: "Layout",
   data() {
     return {
-      prenom: localStorage.getItem("prenom") || "", // ✅ Ajout d'une valeur par défaut
       showMenu: false,
       isMobile: window.innerWidth < 768,
       showInstallButton: false,
-      deferredPrompt: null,
+      deferredPrompt: null
     };
   },
-
   computed: {
+    isLoggedIn() {
+      const jwt = sessionStorage.getItem("jwt");
+      if (!jwt) return false;
+
+      try {
+        const decoded = jwtDecode(jwt);
+        return decoded.exp * 1000 > Date.now();
+      } catch (error) {
+        console.error("🚨 JWT invalide :", error);
+        return false;
+      }
+    },
+    prenom() {
+      return sessionStorage.getItem("prenom") || "";
+    },
+    isPremium() {
+      return sessionStorage.getItem("abo") === "premium";
+    },
+    isAdmin() {
+      return sessionStorage.getItem("role") === "admin";
+    },
+    isEleve() {
+      return sessionStorage.getItem("role") === "eleve";
+    },
     showResponsiveLogo() {
-      return !this.prenom && this.isMobile;
+      return !this.isLoggedIn && this.isMobile;
     }
   },
-
   mounted() {
     window.addEventListener("resize", this.checkMobile);
     window.addEventListener("beforeinstallprompt", (event) => {
@@ -161,9 +162,9 @@ export default {
   methods: {
     toggleMenu() {
       this.showMenu = !this.showMenu;
-      
+
       nextTick(() => {
-        console.log("Menu ouvert :", this.showMenu); // ✅ Debug pour voir si l'état change
+        console.log("Menu ouvert :", this.showMenu);
         const menu = document.querySelector(".mobile-menu");
         if (menu) {
           menu.classList.toggle("active", this.showMenu);
@@ -174,80 +175,31 @@ export default {
       this.isMobile = window.innerWidth < 768;
     },
     logout() {
-  // Récupérer l'email de localStorage si ce n'est pas déjà défini
-  const email = this.email || localStorage.getItem("email");
+      console.log("🚪 Déconnexion en cours...");
 
-  // Log pour signaler le début de la déconnexion
-  console.log("Déconnexion en cours...");
-  
-  // Effacer les éléments stockés dans localStorage
-  console.log("Suppression des éléments dans localStorage...");
-  localStorage.removeItem("prenom");
-  localStorage.removeItem("email");
+      sessionStorage.clear();
+      localStorage.removeItem("refreshjwt");
 
-  // Log pour signaler que les éléments de l'utilisateur sont supprimés
-  console.log("Données utilisateur supprimées de localStorage.");
+      console.log("🔀 Redirection vers /login...");
+      this.$router.push("/login");
 
-  // Vérifier si l'email est défini avant de supprimer les données du cache
-  if (email) {
-    const cacheKey = `studentData_${email}`;
-    const cacheExpirationKey = `${cacheKey}_expiration`;
-    console.log(`Suppression du cache pour ${cacheKey} et ${cacheExpirationKey}`);
-    localStorage.removeItem(cacheKey); // Supprime les données utilisateur mises en cache
-    localStorage.removeItem(cacheExpirationKey); // Supprime la clé d'expiration du cache
-  } else {
-    console.warn("Aucun email trouvé, impossible de supprimer les données du cache.");
-  }
-
-  this.prenom = null;
-
-  // Effacer les éléments dans sessionStorage si nécessaire
-  console.log("Effacement de sessionStorage...");
-  sessionStorage.clear();
-
-  // Supprimer le cache de la PWA
-  if ('caches' in window) {
-    caches.keys().then((cacheNames) => {
-      cacheNames.forEach((cacheName) => {
-        if (cacheName.startsWith('sunbassschool')) {  // Cibler les caches de votre application
-          console.log(`Suppression du cache ${cacheName}`);
-          caches.delete(cacheName).then(() => {
-            console.log(`Cache ${cacheName} supprimé`);
-          });
-        }
-      });
-    });
-  }
-
-  // Réinitialiser le service worker (optionnel, si vous utilisez un service worker)
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.ready.then((registration) => {
-      console.log("Mise à jour du service worker...");
-      registration.update();  // Mettre à jour le service worker pour forcer la mise à jour des ressources en cache
-    });
-  }
-
-  // Log pour signaler la redirection
-  console.log("Redirection vers la page de login...");
-  // Rediriger vers la page de login
-  this.$router.push("/login");
-},
-
-
-
-
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    },
     installPWA() {
       if (this.deferredPrompt) {
         this.deferredPrompt.prompt();
-        this.deferredPrompt.userChoice.then((choiceResult) => {
+        this.deferredPrompt.userChoice.then(() => {
           this.deferredPrompt = null;
           this.showInstallButton = false;
         });
       }
-    },
-  },
+    }
+  }
 };
 </script>
+
 
 
 

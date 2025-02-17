@@ -11,6 +11,7 @@ import Login from '@/views/Login.vue'
 import MonEspace from '@/views/MonEspace.vue'
 import RegisterForm from '@/views/RegisterForm.vue'
 import Prendreuncours from '@/views/Prendreuncours.vue'
+import { refreshToken } from '@/utils/api'
 
 const baseUrl = import.meta.env.MODE === "production" ? "/app/" : "/";
 
@@ -25,7 +26,7 @@ const router = createRouter({
       path: '/mon-espace',
       name: 'mon-espace',
       component: MonEspace,
-      meta: { requiresAuth: true } // 🔥 Protection activée ici
+      meta: { requiresAuth: true }
     },
     {
       path: '/intro',
@@ -56,13 +57,13 @@ const router = createRouter({
       path: '/planning',
       name: 'planning',
       component: Planning,
-      meta: { requiresAuth: true } // 🔥 Protection activée ici
+      meta: { requiresAuth: true }
     },
     {
       path: '/replay',
       name: 'replay',
       component: Replay,
-      meta: { requiresAuth: true } // 🔥 Protection activée ici
+      meta: { requiresAuth: true }
     },
     {
       path: '/videos',
@@ -73,7 +74,7 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard',
       component: Dashboard,
-      meta: { requiresAuth: true } // 🔥 Protection activée ici
+      meta: { requiresAuth: true }
     },
     {
       path: '/login',
@@ -89,15 +90,37 @@ const router = createRouter({
 });
 
 // **🚀 Middleware global pour protéger les routes nécessitant l'authentification**
-router.beforeEach((to, from, next) => {
-  const isAuthenticated = !!localStorage.getItem("token"); // Vérifie si un token existe
+router.beforeEach(async (to, from, next) => {
+  let jwt = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
+  let refreshjwt = localStorage.getItem("refreshjwt");
 
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    console.warn("🚨 Accès refusé, redirection vers /login !");
-    next('/login'); // 🔥 Redirection vers login
-  } else {
-    next(); // ✅ Accès autorisé
+  console.log("🔍 Vérification de l'authentification...");
+  console.log("📦 JWT actuel:", jwt);
+  console.log("📦 RefreshToken disponible:", refreshjwt);
+
+  // 🔒 Vérification des routes nécessitant une authentification
+  if (to.meta.requiresAuth) {
+    if (!jwt) {
+      if (refreshjwt) {
+        console.warn("⚠️ Aucun JWT trouvé, tentative de rafraîchissement...");
+        jwt = await refreshToken();
+
+        if (!jwt) { // 🔥 Si le refresh échoue, on force la déconnexion
+          console.error("🚨 Rafraîchissement échoué, suppression des tokens et redirection vers /login !");
+          localStorage.removeItem("jwt");
+          localStorage.removeItem("refreshjwt");
+          sessionStorage.removeItem("jwt");
+          return next('/login');
+        }
+      } else {
+        console.error("🚨 Aucun JWT et aucun refresh token, redirection vers /login !");
+        return next('/login');
+      }
+    }
   }
+
+  console.log("✅ Accès autorisé !");
+  return next();
 });
 
 export default router;

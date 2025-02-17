@@ -67,14 +67,13 @@
 
 <script>
 import Layout from "../views/Layout.vue";
+import { jwtDecode } from "jwt-decode"; // 📌 Décodage du JWT
 
 export default {
   name: "MonEspace",
   components: { Layout },
   data() {
     return {
-      email: "",
-      prenom: "",
       meetLink: "",
       nextCourseDate: "",
       notifications: [],
@@ -82,93 +81,95 @@ export default {
       playlistyoutube: "",
       loading: true,
       error: "",
-      apiURL: "",  // Initialisation vide, l'URL sera définie dans mounted
       cacheDuration: 5 * 60 * 1000, // ⏳ Durée du cache : 5 minutes
     };
   },
   computed: {
+    isLoggedIn() {
+      const jwt = sessionStorage.getItem("jwt");
+      if (!jwt) return false;
+
+      try {
+        const decoded = jwtDecode(jwt);
+        return decoded.exp * 1000 > Date.now();
+      } catch (error) {
+        console.error("🚨 JWT invalide :", error);
+        return false;
+      }
+    },
+    prenom() {
+      return sessionStorage.getItem("prenom") || "Utilisateur";
+    },
+    email() {
+      return sessionStorage.getItem("email") || "";
+    },
     hasMeetLink() {
       return this.meetLink && this.meetLink !== "Aucun lien disponible";
+    },
+    apiURL() {
+      return `https://script.google.com/macros/s/AKfycbxAP5BgdCAxKbVb5SguGp8G_RHD--3KUXcsIpKDpJMaDXtAA1E2KVtMBSqw6mHgTPP7vg/exec?route=getUsers&email=${encodeURIComponent(this.email)}&prenom=${encodeURIComponent(this.prenom)}`;
     }
   },
   mounted() {
-    const email = localStorage.getItem("email");
-    const prenom = localStorage.getItem("prenom");
-
-    console.log("🔍 LocalStorage récupéré - Email:", email);
-    console.log("🔍 LocalStorage récupéré - Prénom:", prenom);
-
-    if (email && prenom) {
-      this.email = email;
-      this.prenom = prenom;
-      // Définir l'URL dynamiquement après avoir récupéré email et prénom
-      this.apiURL = `https://script.google.com/macros/s/AKfycbxAP5BgdCAxKbVb5SguGp8G_RHD--3KUXcsIpKDpJMaDXtAA1E2KVtMBSqw6mHgTPP7vg/exec?route=getUsers&email=${encodeURIComponent(this.email)}&prenom=${encodeURIComponent(this.prenom)}`;
-      this.fetchStudentData();
-    } else {
+    if (!this.isLoggedIn) {
       this.error = "Utilisateur non connecté.";
       this.loading = false;
-    }
-  },
-  methods: {
-  async fetchStudentData() {
-    const cacheKey = `studentData_${this.email}`;
-    const cacheExpirationKey = `${cacheKey}_expiration`;
-    const cachedData = localStorage.getItem(cacheKey);
-    const cacheExpiration = localStorage.getItem(cacheExpirationKey);
-
-    const isCacheValid = cachedData && cacheExpiration && Date.now() < parseInt(cacheExpiration, 10);
-
-    if (isCacheValid) {
-      console.log("⚡ Chargement des données depuis le cache");
-      this.updateStudentData(JSON.parse(cachedData));
-      this.loading = false; // ✅ Arrête le spinner
       return;
     }
+    this.fetchStudentData();
+  },
+  methods: {
+    async fetchStudentData() {
+      const cacheKey = `studentData_${this.email}`;
+      const cacheExpirationKey = `${cacheKey}_expiration`;
+      const cachedData = localStorage.getItem(cacheKey);
+      const cacheExpiration = localStorage.getItem(cacheExpirationKey);
+      const isCacheValid = cachedData && cacheExpiration && Date.now() < parseInt(cacheExpiration, 10);
 
-    console.log("🔄 Cache expiré, récupération des nouvelles données...");
-    localStorage.removeItem(cacheKey);
-    localStorage.removeItem(cacheExpirationKey);
-
-    try {
-      console.log("🌐 Requête envoyée :", this.apiURL);
-      const response = await fetch(this.apiURL);
-
-      if (!response.ok) throw new Error(`Erreur HTTP : ${response.status}`);
-
-      const data = await response.json();
-      console.log("📩 Données reçues de l'API :", data);
-
-      // Vérification du type de la réponse (objet unique, pas un tableau)
-      if (data && data.email && data.prenom) {
-        // ✅ Mise à jour des données avec l'utilisateur
-        this.updateStudentData(data);
-
-        // ✅ Stocker les nouvelles données en cache
-        localStorage.setItem(cacheKey, JSON.stringify(data));
-        localStorage.setItem(cacheExpirationKey, (Date.now() + this.cacheDuration).toString());
-      } else {
-        this.error = "❌ Données incorrectes reçues de l'API.";
-        console.error("❌ Données incorrectes reçues : ", data);
+      if (isCacheValid) {
+        console.log("⚡ Chargement des données depuis le cache");
+        this.updateStudentData(JSON.parse(cachedData));
+        this.loading = false;
+        return;
       }
 
-    } catch (err) {
-      this.error = "❌ Erreur de récupération des données.";
-      console.error("❌ Erreur lors de la requête API :", err);
-    } finally {
-      this.loading = false; // ✅ Toujours arrêter le spinner
+      console.log("🔄 Cache expiré, récupération des nouvelles données...");
+      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(cacheExpirationKey);
+
+      try {
+        console.log("🌐 Requête envoyée :", this.apiURL);
+        const response = await fetch(this.apiURL);
+
+        if (!response.ok) throw new Error(`Erreur HTTP : ${response.status}`);
+
+        const data = await response.json();
+        console.log("📩 Données reçues de l'API :", data);
+
+        if (data && data.email && data.prenom) {
+          this.updateStudentData(data);
+          localStorage.setItem(cacheKey, JSON.stringify(data));
+          localStorage.setItem(cacheExpirationKey, (Date.now() + this.cacheDuration).toString());
+        } else {
+          this.error = "❌ Données incorrectes reçues de l'API.";
+        }
+
+      } catch (err) {
+        this.error = "❌ Erreur de récupération des données.";
+        console.error("❌ Erreur lors de la requête API :", err);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    updateStudentData(data) {
+      this.meetLink = data.meet ?? "Aucun lien disponible";
+      this.nextCourseDate = data.nextCourseDate ?? "Aucune date prévue";
+      this.notifications = data.notifications ?? [];
+      this.objectif = data.objectif ?? "Aucun objectif défini";
+      this.playlistyoutube = data.playlistyoutube ?? "";
     }
-  },
-
-  updateStudentData(data) {
-    this.prenom = data.prenom ?? "Utilisateur";
-    this.meetLink = data.meet ?? "Aucun lien disponible";
-    this.nextCourseDate = data.nextCourseDate ?? "Aucune date prévue";
-    this.notifications = data.notifications ?? [];
-    this.objectif = data.objectif ?? "Aucun objectif défini";
-    this.playlistyoutube = data.playlistyoutube ?? "";
   }
-}
-
 };
 </script>
 

@@ -9,6 +9,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 
 import App from './App.vue'
 import router from './router'
+import { refreshToken } from './utils/api.js' // 🔥 Import du refreshToken
 
 const app = createApp(App)
 
@@ -16,6 +17,26 @@ app.use(createPinia())
 app.use(router)
 
 app.mount('#app')
+
+// ✅ Vérification du token au démarrage
+(async () => {
+  console.log("🔍 Vérification de l'authentification au démarrage...");
+  let jwt = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
+  const refreshjwt = localStorage.getItem("refreshjwt");
+
+  console.log("📦 JWT actuel:", jwt);
+  console.log("📦 RefreshToken disponible:", refreshjwt);
+
+  if (!jwt && refreshjwt) {
+    console.warn("⚠️ Aucun JWT trouvé, tentative de rafraîchissement...");
+    jwt = await refreshToken();
+    if (jwt) {
+      console.log("✅ Token rafraîchi avec succès !");
+    } else {
+      console.error("🚨 Rafraîchissement échoué, utilisateur non authentifié.");
+    }
+  }
+})();
 
 // ✅ Enregistrement du Service Worker avec gestion des mises à jour
 if ("serviceWorker" in navigator) {

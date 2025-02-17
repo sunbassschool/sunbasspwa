@@ -1,5 +1,5 @@
 export async function fetchWithAuth(url, method = "GET", body = null, attempt = 1) {
-    let token = sessionStorage.getItem("token");
+    let token = localStorage.getItem("jwt") || sessionStorage.getItem("jwt"); // 🔥 Harmonisation avec login()
 
     if (!token) {
         console.warn("⚠️ Pas de token disponible. Tentative de rafraîchissement...");
@@ -24,16 +24,9 @@ export async function fetchWithAuth(url, method = "GET", body = null, attempt = 
 
     try {
         console.log(`🌐 Envoi de la requête : ${method} ${url}`);
-        const response = await fetch(url, options);
-        
-        // ✅ Vérifier si la réponse est bien un JSON
-        const contentType = response.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-            const errorText = await response.text();
-            console.error("🚨 Réponse non JSON reçue :", errorText);
-            return { error: "Réponse invalide du serveur." };
-        }
+        console.log("🛠️ JWT envoyé dans Authorization:", token);
 
+        const response = await fetch(url, options);
         const data = await response.json();
 
         if (response.status === 401) {
@@ -56,9 +49,10 @@ export async function fetchWithAuth(url, method = "GET", body = null, attempt = 
     }
 }
 
+
 export async function refreshToken() {
     const email = sessionStorage.getItem("email");
-    const storedRefreshToken = localStorage.getItem("refreshToken"); // 🔥 Stocke le refreshToken dans localStorage
+    const storedRefreshToken = localStorage.getItem("refreshjwt"); // 🔥 Correspond à ce que login() stocke
 
     if (!email || !storedRefreshToken) {
         console.warn("⚠️ Impossible de rafraîchir le token : informations manquantes.");
@@ -72,7 +66,8 @@ export async function refreshToken() {
         const data = await response.json();
 
         if (data.status === "success" && data.token) {
-            sessionStorage.setItem("token", data.token); // 🔥 Stocke le token mis à jour dans sessionStorage
+            localStorage.setItem("jwt", data.token); // 🔥 Stockage dans localStorage pour que le routeur le voie
+            sessionStorage.setItem("jwt", data.token);
             console.log("🔄 ✅ Token rafraîchi avec succès !");
             return data.token;
         } else {
@@ -91,8 +86,8 @@ export function logout() {
     console.warn("👋 Déconnexion en cours...");
     sessionStorage.removeItem("prenom");
     sessionStorage.removeItem("email");
-    sessionStorage.removeItem("token");
-    localStorage.removeItem("refreshToken"); // 🔥 Supprime aussi le refreshToken pour plus de sécurité
+    sessionStorage.removeItem("jwt");
+    localStorage.removeItem("refreshjwt"); // 🔥 Correspondance avec login()
 
     window.location.href = "/login"; // 🔥 Redirection immédiate vers la page de connexion
 }
