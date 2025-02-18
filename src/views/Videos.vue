@@ -40,7 +40,7 @@
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title">{{ currentVideoTitle }}</h5> <!-- Affiche dynamiquement le titre de la vidéo -->
+              <h5 class="modal-title">{{ currentVideoTitle }}</h5>
               <button type="button" class="btn-close" @click="closeModal"></button>
             </div>
             <div class="modal-body">
@@ -59,6 +59,7 @@
   </Layout>
 </template>
 
+
 <script>
 import Layout from "../views/Layout.vue";
 import axios from "axios";
@@ -73,7 +74,7 @@ export default {
     const search = ref("");
     const showModal = ref(false);
     const videoUrl = ref("");
-    const currentVideoTitle = ref(""); // Titre dynamique de la vidéo
+    const currentVideoTitle = ref(""); 
 
     // ✅ Infos Google Sheet
     const SHEET_ID = "1DzXQORma_DuTe5TWvEmlhDIjFhqOVyJcjK2mxvXEhLc";
@@ -88,7 +89,6 @@ export default {
       const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
       const cachedData = localStorage.getItem(cacheKey);
 
-      // ✅ Vérification du cache avant d'appeler l'API
       if (cachedData && cacheTimestamp && Date.now() - cacheTimestamp < cacheDuration) {
         console.log("⚡ Chargement des vidéos depuis le cache");
         videos.value = JSON.parse(cachedData);
@@ -137,12 +137,18 @@ export default {
       return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : "";
     };
 
-    // ✅ Filtrage des vidéos
+    // ✅ Filtrage des vidéos (titre + mots-clés)
     const filteredVideos = computed(() => {
       if (!search.value) return videos.value;
-      return videos.value.filter(video =>
-        video.MotsCles.toLowerCase().includes(search.value.toLowerCase())
-      );
+
+      const searchLower = search.value.toLowerCase();
+
+      return videos.value.filter(video => {
+        const titleLower = video.Titre ? video.Titre.toLowerCase() : "";
+        const keywordsLower = video.MotsCles ? video.MotsCles.toLowerCase() : "";
+
+        return titleLower.includes(searchLower) || keywordsLower.includes(searchLower);
+      });
     });
 
     const openVideo = (url, title) => {
@@ -168,10 +174,22 @@ export default {
 
     onMounted(fetchVideos);
 
-    return { videos, loading, search, filteredVideos, getThumbnail, openVideo, closeModal, showModal, videoUrl, currentVideoTitle };
+    return { 
+      videos, 
+      loading, 
+      search, 
+      filteredVideos, 
+      getThumbnail, 
+      openVideo, 
+      closeModal, 
+      showModal, 
+      videoUrl, 
+      currentVideoTitle 
+    };
   },
 };
 </script>
+
 
 
 <style scoped>

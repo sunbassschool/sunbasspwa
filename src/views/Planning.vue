@@ -84,7 +84,7 @@ export default {
       }
     });
 
-    // ✅ Récupère l'email depuis le JWT
+    // ✅ Récupère l'email et prénom depuis le JWT
     const email = computed(() => sessionStorage.getItem("email") || "");
     const prenom = computed(() => sessionStorage.getItem("prenom") || "");
 
@@ -110,68 +110,80 @@ export default {
           }).format(parsedDate);
     };
 
+    // ✅ Vérifie si les données en cache sont valides
+    const isCacheValid = (data) => {
+      return (
+        Array.isArray(data) &&
+        data.length > 0 &&
+        data.every(item => item && typeof item === "object" && "date" in item && "meet" in item)
+      );
+    };
+
     const fetchPlanningData = async () => {
-  if (!isLoggedIn.value) {
-    loading.value = false;
-    return;
-  }
-
-  const cacheKey = `planning_${email.value}_${prenom.value}`;
-  const cacheTimestampKey = `${cacheKey}_timestamp`;
-  const cachedData = localStorage.getItem(cacheKey);
-  const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
-  const cacheExpired = !cacheTimestamp || Date.now() - cacheTimestamp > cacheDuration;
-
-  if (cachedData && !cacheExpired) {
-    try {
-      const parsedData = JSON.parse(cachedData);
-      
-      // Validation supplémentaire de la structure des données
-      if (!Array.isArray(parsedData) || parsedData.length === 0 || !parsedData.every(item => item.date && item.meet)) {
-        throw new Error("Cache corrompu, suppression...");
+      if (!isLoggedIn.value) {
+        loading.value = false;
+        return;
       }
 
-      console.log("⚡ Chargement du planning depuis le cache");
-      planningData.value = parsedData;
-      loading.value = false;
-      return;
-    } catch (error) {
-      console.warn(error.message);
-      localStorage.removeItem(cacheKey);
-      localStorage.removeItem(cacheTimestampKey);
-    }
-  }
+      const cacheKey = `planning_${email.value}_${prenom.value}`;
+      const cacheTimestampKey = `${cacheKey}_timestamp`;
+      const cachedData = localStorage.getItem(cacheKey);
+      const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
+      const cacheExpired = !cacheTimestamp || Date.now() - cacheTimestamp > cacheDuration;
 
-  if (cacheExpired) {
-    console.log("🔄 Cache expiré, récupération des nouvelles données...");
-    localStorage.removeItem(cacheKey);
-    localStorage.removeItem(cacheTimestampKey);
-  }
+      if (cachedData && !cacheExpired) {
+        try {
+          const parsedData = JSON.parse(cachedData);
 
-  try {
-    console.log("🌐 Requête envoyée :", `${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
-    const response = await axios.get(`${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
+          if (isCacheValid(parsedData)) {
+            console.log("⚡ Chargement du planning depuis le cache");
+            planningData.value = parsedData.map(item => ({
+              date: item.date,
+              formattedDate: formatDate(item.date),
+              meet: item.meet,
+            }));
+            loading.value = false;
+            return;
+          } else {
+            console.warn("🚨 Cache invalide ou incomplet, récupération depuis l'API...");
+          }
+        } catch (error) {
+          console.warn("❌ Erreur de parsing du cache, suppression...");
+          localStorage.removeItem(cacheKey);
+          localStorage.removeItem(cacheTimestampKey);
+        }
+      }
 
-    console.log("✅ Données reçues :", response.data);
+      if (cacheExpired) {
+        console.log("🔄 Cache expiré, récupération des nouvelles données...");
+        localStorage.removeItem(cacheKey);
+        localStorage.removeItem(cacheTimestampKey);
+      }
 
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      planningData.value = response.data.map((item) => ({
-        date: item.date,
-        formattedDate: item.date ? formatDate(item.date) : "Date invalide",
-        meet: item.meet,
-      }));
+      try {
+        console.log("🌐 Requête envoyée :", `${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
+        const response = await axios.get(`${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
 
-      localStorage.setItem(cacheKey, JSON.stringify(planningData.value));
-      localStorage.setItem(cacheTimestampKey, Date.now());
-    } else {
-      console.error("❌ Les données récupérées sont invalides");
-      alert("Erreur lors du chargement des cours.");
-    }
-  } catch (error) {
-    console.error("❌ Erreur lors du chargement des cours :", error);
-    alert("Une erreur est survenue lors du chargement de ton planning.");
-  } finally {
-    loading.value = false;
+        console.log("✅ Données reçues :", response.data);
+
+        if (isCacheValid(response.data)) {
+          planningData.value = response.data.map(item => ({
+            date: item.date,
+            formattedDate: formatDate(item.date),
+            meet: item.meet,
+          }));
+
+          localStorage.setItem(cacheKey, JSON.stringify(planningData.value));
+          localStorage.setItem(cacheTimestampKey, Date.now());
+        } else {
+          console.error("❌ Données reçues invalides");
+          alert("Erreur lors du chargement des cours.");
+        }
+      } catch (error) {
+        console.error("❌ Erreur lors du chargement des cours :", error);
+        alert("Une erreur est survenue lors du chargement de ton planning.");
+      } finally {
+        loading.value = false;
       }
     };
 
@@ -187,6 +199,7 @@ export default {
   },
 };
 </script>
+
 
 
 

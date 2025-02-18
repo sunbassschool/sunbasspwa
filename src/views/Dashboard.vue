@@ -135,13 +135,24 @@ export default {
 
   // Fonction de validation du cache
   isCacheValid(data) {
-    // Vérifie si les propriétés attendues existent et sont dans le bon format
-    return data && data.prochainCours && data.prochainCours.date && data.prochainCours.cours;
-  },
+  if (!data || typeof data !== "object") return false;
+
+  // Vérifie si "prochainCours" existe et est bien structuré
+  const hasValidProchainCours =
+    data.prochainCours &&
+    typeof data.prochainCours === "object" &&
+    typeof data.prochainCours.date === "string" &&
+    typeof data.prochainCours.cours === "string";
+
+  // Vérifie si "objectif" existe et est une chaîne
+  const hasValidObjectif = typeof data.objectif === "string";
+
+  return hasValidProchainCours || hasValidObjectif; // On valide si au moins un des deux est correct
+},
 
   updateData(data) {
     const prochainCours = data.prochainCours
-      ? `${data.prochainCours.date} - ${data.prochainCours.cours} <a href="${data.prochainCours.meet}" target="_blank">Lien Meet</a>`
+      ? `${data.prochainCours.date} - ${data.prochainCours.cours} Lien d'accès : <a href="${data.prochainCours.meet}" target="_blank">Lien Meet</a>`
       : "Pas de cours prévu.";
 
     this.cards = [
@@ -153,7 +164,7 @@ export default {
       { 
         icon: "bi bi-flag", 
         title: "Objectif actuel", 
-        text: `Ton objectif : ${data.objectif || "Aucun objectif défini"}` 
+        text: `${data.objectif || "Aucun objectif défini"}` 
       }
     ];
   },

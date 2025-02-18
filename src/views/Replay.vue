@@ -135,16 +135,32 @@ export default {
       return selectedVideo.value ? `https://www.youtube.com/embed/${selectedVideo.value}` : "";
     });
 
+    // ✅ Filtrage des vidéos en incluant les mots-clés **ET** le titre
     const filteredVideos = computed(() => {
       if (!search.value) return videos.value;
-      return videos.value.filter(video =>
-        video.MotsCles.toLowerCase().includes(search.value.toLowerCase())
-      );
+
+      const searchLower = search.value.toLowerCase();
+
+      return videos.value.filter(video => {
+        const titleLower = video.Titre ? video.Titre.toLowerCase() : "";
+        const keywordsLower = video.MotsCles ? video.MotsCles.toLowerCase() : "";
+
+        return titleLower.includes(searchLower) || keywordsLower.includes(searchLower);
+      });
     });
 
     onMounted(fetchVideos);
 
-    return { videos, loading, search, selectedVideo, selectedVideoEmbed, filteredVideos, getThumbnail, openVideo };
+    return { 
+      videos, 
+      loading, 
+      search, 
+      selectedVideo, 
+      selectedVideoEmbed, 
+      filteredVideos, 
+      getThumbnail, 
+      openVideo 
+    };
   },
 };
 </script>

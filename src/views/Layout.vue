@@ -10,7 +10,7 @@
         <img v-if="showResponsiveLogo" src="https://www.sunbassschool.com/wp-content/uploads/2025/02/logo-SBS-petit-noir-rond-ok.png" alt="Logo SunBassSchool" class="logo responsive-logo" />
 
         <!-- ✅ Menu Hamburger en Responsive -->
-        <button class="menu-btn" v-if="isMobile && isLoggedIn && prenom" @click="toggleMenu">
+        <button class="menu-btn" v-if="isMobile&isLoggedIn" @click="toggleMenu">
           <i class="bi bi-list"></i>
         </button>
 
@@ -26,7 +26,7 @@
         </div>
 
         <!-- ✅ Boutons uniquement si connecté -->
-        <div v-if="isLoggedIn && prenom" class="auth-buttons">
+        <div v-if="isLoggedIn" class="auth-buttons">
           <router-link to="/prendreuncours" class="nav-link btn-cours">
             <i class="bi bi-play-circle"></i>
             <span>Prendre un cours</span>
@@ -43,7 +43,7 @@
     <!-- ✅ Menu latéral -->
     <div v-if="showMenu" class="menu-overlay" @click="toggleMenu"></div>
     <div class="mobile-menu" :class="{ 'active': showMenu }">
-      <router-link to="/mon-espace" class="nav-link mon-espace" v-if="isLoggedIn && prenom">
+      <router-link to="/mon-espace" class="nav-link mon-espace" v-if="isLoggedIn">
         <i class="bi bi-person-circle"></i>
         <span>Mon Espace</span>
       </router-link>
@@ -77,13 +77,13 @@
           </li>
 
           <!-- ✅ Planning et Replay uniquement si connecté -->
-          <li v-if="isLoggedIn && prenom" class="nav-item">
+          <li v-if="isLoggedIn" class="nav-item">
             <router-link class="nav-link" to="/planning">
               <i class="bi bi-calendar-check"></i>
               <span>Plannings</span>
             </router-link>
           </li>
-          <li v-if="isLoggedIn && prenom" class="nav-item">
+          <li v-if="isLoggedIn" class="nav-item">
             <router-link class="nav-link" to="/replay">
               <i class="bi bi-play-btn"></i>
               <span>Replay</span>
@@ -113,6 +113,7 @@ export default {
   name: "Layout",
   data() {
     return {
+      jwt: sessionStorage.getItem("jwt") || localStorage.getItem("jwt") || "",
       showMenu: false,
       isMobile: window.innerWidth < 768,
       showInstallButton: false,
@@ -121,16 +122,7 @@ export default {
   },
   computed: {
     isLoggedIn() {
-      const jwt = sessionStorage.getItem("jwt");
-      if (!jwt) return false;
-
-      try {
-        const decoded = jwtDecode(jwt);
-        return decoded.exp * 1000 > Date.now();
-      } catch (error) {
-        console.error("🚨 JWT invalide :", error);
-        return false;
-      }
+      return !!this.jwt; // ✅ Devient réactif, Vue mettra à jour les boutons automatiquement
     },
     prenom() {
       return sessionStorage.getItem("prenom") || "";
@@ -149,6 +141,9 @@ export default {
     }
   },
   mounted() {
+    console.log("✅ Vérification de la session existante...");
+    this.checkExistingSession();
+
     window.addEventListener("resize", this.checkMobile);
     window.addEventListener("beforeinstallprompt", (event) => {
       event.preventDefault();
@@ -174,12 +169,59 @@ export default {
     checkMobile() {
       this.isMobile = window.innerWidth < 768;
     },
+    checkExistingSession() {
+      let jwt = sessionStorage.getItem("jwt") || localStorage.getItem("jwt");
+
+      if (!jwt) {
+        console.warn("⚠️ Aucun JWT trouvé. L'utilisateur doit se reconnecter.");
+        return;
+      }
+
+      try {
+        const decoded = jwtDecode(jwt);
+
+        // Vérifie si le JWT est expiré
+        if (decoded.exp * 1000 < Date.now()) {
+          console.warn("⚠️ JWT expiré. Suppression du cache et redirection vers /login.");
+          this.logout();
+          return;
+        }
+
+        console.log("✅ JWT valide, restauration de la session...");
+        sessionStorage.setItem("jwt", jwt);
+        this.jwt = jwt; // ✅ Mise à jour réactive
+        this.decodeJWT(jwt);
+
+      } catch (error) {
+        console.error("🚨 JWT corrompu ou invalide :", error);
+        this.logout();
+      }
+    },
+    storeSession(data) {
+      sessionStorage.setItem("jwt", data.jwt);
+      localStorage.setItem("jwt", data.jwt);
+      localStorage.setItem("refreshjwt", data.refreshToken);
+      this.jwt = data.jwt; // ✅ Mise à jour réactive
+      this.decodeJWT(data.jwt);
+    },
+    decodeJWT(jwt) {
+      try {
+        const decoded = jwtDecode(jwt);
+        console.log("🎫 JWT décodé :", decoded);
+        sessionStorage.setItem("prenom", decoded.prenom || "");
+        sessionStorage.setItem("email", decoded.email || "");
+      } catch (error) {
+        console.error("🚨 Erreur lors du décodage du JWT :", error);
+      }
+    },
     logout() {
       console.log("🚪 Déconnexion en cours...");
 
       sessionStorage.clear();
+      localStorage.removeItem("jwt");
       localStorage.removeItem("refreshjwt");
 
+      this.jwt = ""; // ✅ Mise à jour réactive pour cacher les boutons instantanément
       console.log("🔀 Redirection vers /login...");
       this.$router.push("/login");
 
@@ -199,6 +241,8 @@ export default {
   }
 };
 </script>
+
+
 
 
 

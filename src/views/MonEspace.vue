@@ -1,13 +1,13 @@
 <template>
   <Layout>
-    <div class="container mt-5">
+    <div class="container mt-4 espace-container">
       <div class="row justify-content-center">
-        <div class="w-100 mx-auto">
+        <div class="col-lg-12 col-md-10">
           <div class="card glass-card p-4 text-center animated-card">
-            <h2 class="mb-3 text-primary">🎸 Mon Espace Personnel</h2>
+            
 
             <!-- Affichage en cas de chargement -->
-            <div v-if="loading" class="text-center">
+            <div v-if="loading" class="loading-container">
               <div class="spinner-border text-primary" role="status"></div>
               <p class="mt-2 text-muted">Chargement des données...</p>
             </div>
@@ -18,44 +18,106 @@
             </div>
 
             <!-- Affichage des informations -->
-            <div v-else>
-              <h4 class="mb-4">👋 Bonjour, <strong>{{ prenom }}</strong> !</h4>
+            <div v-else class="info-section">
+              
 
               <!-- Bloc du prochain cours -->
-              <div class="info-box bg-light p-3 rounded shadow-sm">
-                <h5 class="mb-2">📅 Prochain cours</h5>
-                <p class="font-weight-bold">{{ nextCourseDate }}</p>
-                <a v-if="hasMeetLink" :href="meetLink" target="_blank" class="btn btn-success btn-lg mt-2">
-                  🎥 Accéder à mon cours
-                </a>
-                <p v-else class="text-danger mt-2">⚠ Aucun lien disponible.</p>
-              </div>
+            <!-- Bloc du prochain cours -->
+            <div class="info-box goal-box text-center">
+  <input 
+    v-if="isEditing" 
+    v-model="user.objectif" 
+    class="form-control form-control-sm w-100" 
+    @keyup.enter="updateObjectif"
+  >
+  <span 
+    v-else 
+    class="badge bg-warning text-dark fs-5 d-inline-block text-wrap w-100 justify-content-center">
+    💪 <span class="text-break fw-bold lh-sm justify-content-center">{{ user.objectif }}</span>
+    <button 
+      v-if="!isEditing" 
+      @click="isEditing = true" 
+      class="btn btn-link p-0 text-secondary"
+    >
+      ✏️
+    </button>
+  </span>
 
-              <!-- Notifications récentes -->
-              <div v-if="notifications.length" class="info-box p-3 mt-4 bg-white shadow-sm rounded">
-                <h5>📢 Notifications</h5>
-                <ul class="list-group">
-                  <li v-for="(notification, index) in notifications" :key="index" class="list-group-item">
-                    🔔 {{ notification }}
+
+
+  
+ 
+  <button v-if="isEditing" @click="updateObjectif" class="btn btn-link p-0 text-success">
+    💾
+  </button>
+</div>
+
+
+
+              <!-- Ressources -->
+              <div class="info-box resource-box">
+                <hr class="my-1 resource-separator">
+
+                <ul class="list-group list-unstyled">
+                  <li v-if="user.espace_google_drive" class="resource-item">
+                    <a :href="user.espace_google_drive" target="_blank">
+                      📂 Mon espace Google Drive
+                    </a>
+                  </li><hr class="my-2 resource-separator">
+                  <li v-if="user.playlist_youtube" class="resource-item">
+                    <a :href="user.playlist_youtube" target="_blank">
+                      🎵 Ma playlist YouTube
+                    </a>
                   </li>
                 </ul>
               </div>
 
-              <!-- Ressources disponibles -->
-              <div class="info-box bg-light p-3 rounded shadow-sm mt-4">
-                <h5>📚 Ressources</h5>
-                <ul class="list-group">
-                  <li class="list-group-item">
-                    📄 <a href="#">Partitions de la semaine</a>
-                  </li>
-                  <li class="list-group-item">
-                    🎵 <a href="#">Exercices à travailler</a>
-                  </li>
-                  <li class="list-group-item">
-                    🎥 <a href="#">Replay du dernier cours</a>
-                  </li>
-                </ul>
-              </div>
+              <!-- Informations complémentaires -->
+              
+
+
+
+<!-- Informations complémentaires -->
+<div class="info-box profile-box">
+  <button class="btn btn-primary w-100 d-flex align-items-center justify-content-center py-3 fw-bold" @click="showInfos = true">
+  <span class="fs-4">👤</span> <span class="ms-2">Infos personnelles</span>
+</button>
+
+
+</div>
+
+<!-- Modale qui affiche les infos -->
+<!-- Modale qui affiche les infos -->
+<div v-if="showInfos" class="overlay" @click="showInfos = false">
+  <div class="modal-content" @click.stop>
+    <button class="close-btn" @click="showInfos = false">✖</button>
+    <h5 class="minimal-title">👤 Infos personnelles</h5>
+
+    <ul class="list-unstyled">
+      <li>
+        <strong>Email : </strong>
+        <span v-if="!isEditingInfo">{{ user.email }}</span>
+        <input v-else v-model="user.email" class="edit-input" />
+      </li>
+      <li>
+        <strong>Téléphone : </strong>
+        <span v-if="!isEditingInfo">{{ user.telephone }}</span>
+        <input v-else v-model="user.telephone" class="edit-input" />
+      </li>
+      <li><strong>Cursus : </strong> {{ user.cursus }}</li>
+      <li><strong>Trimestre : </strong> {{ user.trimestre || "Non défini" }}</li>
+      <li><strong>Statut : </strong> {{ user.statut }}</li>
+    </ul>
+
+    <!-- Boutons Modifier / Sauvegarder -->
+    <button v-if="!isEditingInfo" @click="isEditingInfo = true" class="edit-btn">✏️ Modifier</button>
+    <button v-if="isEditingInfo" @click="updateInfosPerso" class="save-btn">💾 Sauvegarder</button>
+  </div>
+</div>
+
+
+
+
             </div>
           </div>
         </div>
@@ -64,110 +126,146 @@
   </Layout>
 </template>
 
-
 <script>
 import Layout from "../views/Layout.vue";
-import { jwtDecode } from "jwt-decode"; // 📌 Décodage du JWT
+import { jwtDecode } from "jwt-decode";
 
 export default {
   name: "MonEspace",
   components: { Layout },
   data() {
     return {
-      meetLink: "",
-      nextCourseDate: "",
-      notifications: [],
-      objectif: "",
-      playlistyoutube: "",
+      showInfos: false,
+      isEditingInfo: false,
+      isEditing: false,
+      user: {
+        prenom: "",
+        email: "",
+        telephone: "",
+        cursus: "",
+        trimestre: "",
+        objectif: "",
+        statut: "",
+        espace_google_drive: "",
+        playlist_youtube: "",
+      },
       loading: true,
       error: "",
-      cacheDuration: 5 * 60 * 1000, // ⏳ Durée du cache : 5 minutes
+      cacheDuration: 10 * 60 * 1000,
+      apiBaseURL: "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/",
+      routes: {
+        GET: "AKfycbzhx-QtcI-0pzAl1VuXhsd6Ju74rTz7AJsU34jO61mT_lxq4lqin7ueSsm68cfscJQi_Q/exec",
+        POST: "AKfycbwY21fDDGxxDabhjSERwQrpGe_dqdbeqebU5MGbLZUT3ilFMKdtGOqswGykCJuOjW72EQ/exec"
+      }
     };
   },
   computed: {
-    isLoggedIn() {
-      const jwt = sessionStorage.getItem("jwt");
-      if (!jwt) return false;
-
-      try {
-        const decoded = jwtDecode(jwt);
-        return decoded.exp * 1000 > Date.now();
-      } catch (error) {
-        console.error("🚨 JWT invalide :", error);
-        return false;
-      }
+    jwt() {
+      return sessionStorage.getItem("jwt") || "";
     },
     prenom() {
-      return sessionStorage.getItem("prenom") || "Utilisateur";
+      return sessionStorage.getItem("prenom") || "";
     },
-    email() {
-      return sessionStorage.getItem("email") || "";
+    cacheKey() {
+      return `userData_${this.prenom}`;
     },
-    hasMeetLink() {
-      return this.meetLink && this.meetLink !== "Aucun lien disponible";
-    },
-    apiURL() {
-      return `https://script.google.com/macros/s/AKfycbxAP5BgdCAxKbVb5SguGp8G_RHD--3KUXcsIpKDpJMaDXtAA1E2KVtMBSqw6mHgTPP7vg/exec?route=getUsers&email=${encodeURIComponent(this.email)}&prenom=${encodeURIComponent(this.prenom)}`;
+    cacheExpirationKey() {
+      return `${this.cacheKey}_expiration`;
     }
   },
   mounted() {
-    if (!this.isLoggedIn) {
+    if (!this.jwt) {
       this.error = "Utilisateur non connecté.";
       this.loading = false;
       return;
     }
-    this.fetchStudentData();
+    this.loadUserData();
   },
   methods: {
-    async fetchStudentData() {
-      const cacheKey = `studentData_${this.email}`;
-      const cacheExpirationKey = `${cacheKey}_expiration`;
-      const cachedData = localStorage.getItem(cacheKey);
-      const cacheExpiration = localStorage.getItem(cacheExpirationKey);
-      const isCacheValid = cachedData && cacheExpiration && Date.now() < parseInt(cacheExpiration, 10);
+    toggleModal(state) {
+      this.showInfos = state;
+    },
 
-      if (isCacheValid) {
-        console.log("⚡ Chargement des données depuis le cache");
-        this.updateStudentData(JSON.parse(cachedData));
-        this.loading = false;
-        return;
-      }
-
-      console.log("🔄 Cache expiré, récupération des nouvelles données...");
-      localStorage.removeItem(cacheKey);
-      localStorage.removeItem(cacheExpirationKey);
-
+    async updateUserData(updateData) {
       try {
-        console.log("🌐 Requête envoyée :", this.apiURL);
-        const response = await fetch(this.apiURL);
+        console.log("🔄 Mise à jour en cours...");
+
+        const response = await fetch(`${this.apiBaseURL}${this.routes.POST}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+          body: JSON.stringify({ route: "updateEleve", jwt: this.jwt, data: updateData })
+        });
 
         if (!response.ok) throw new Error(`Erreur HTTP : ${response.status}`);
 
         const data = await response.json();
-        console.log("📩 Données reçues de l'API :", data);
+        console.log("✅ Réponse API :", data);
 
-        if (data && data.email && data.prenom) {
-          this.updateStudentData(data);
-          localStorage.setItem(cacheKey, JSON.stringify(data));
-          localStorage.setItem(cacheExpirationKey, (Date.now() + this.cacheDuration).toString());
+        if (data.status === "success") {
+          alert("✅ Mise à jour réussie !");
+          this.updateLocalCache(updateData);
         } else {
-          this.error = "❌ Données incorrectes reçues de l'API.";
+          alert("❌ Erreur lors de la mise à jour.");
         }
-
       } catch (err) {
-        this.error = "❌ Erreur de récupération des données.";
-        console.error("❌ Erreur lors de la requête API :", err);
+        console.error("❌ Erreur API :", err.message);
+        alert("Erreur de connexion au serveur.");
+      }
+    },
+
+    updateObjectif() {
+      this.isEditing = false;
+      this.updateUserData({ objectif: this.user.objectif });
+    },
+
+    updateInfosPerso() {
+      this.isEditingInfo = false;
+      this.updateUserData({ email: this.user.email, telephone: this.user.telephone });
+    },
+
+    loadUserData() {
+      const cachedData = localStorage.getItem(this.cacheKey);
+      const cacheExpiration = localStorage.getItem(this.cacheExpirationKey);
+
+      if (cachedData && cacheExpiration && Date.now() < parseInt(cacheExpiration, 10)) {
+        console.log("⚡ Chargement depuis le cache");
+        this.user = JSON.parse(cachedData);
+        this.loading = false;
+      } else {
+        console.log("🔄 Chargement depuis l'API...");
+        this.fetchUserData();
+      }
+    },
+
+    async fetchUserData() {
+      try {
+        const response = await fetch(`${this.apiBaseURL}${this.routes.GET}?route=recupInfosMembres&jwt=${encodeURIComponent(this.jwt)}&prenom=${encodeURIComponent(this.prenom)}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" }
+        });
+
+        if (!response.ok) throw new Error(`Erreur HTTP : ${response.status}`);
+
+        const data = await response.json();
+        if (data) {
+          this.user = data;
+          this.updateLocalCache(data);
+        } else {
+          this.error = "Données utilisateur introuvables.";
+        }
+      } catch (err) {
+        this.error = "Erreur de récupération des données.";
+        console.error("❌ Erreur API :", err.message);
       } finally {
         this.loading = false;
       }
     },
 
-    updateStudentData(data) {
-      this.meetLink = data.meet ?? "Aucun lien disponible";
-      this.nextCourseDate = data.nextCourseDate ?? "Aucune date prévue";
-      this.notifications = data.notifications ?? [];
-      this.objectif = data.objectif ?? "Aucun objectif défini";
-      this.playlistyoutube = data.playlistyoutube ?? "";
+    updateLocalCache(data) {
+      const updatedData = { ...JSON.parse(localStorage.getItem(this.cacheKey) || "{}"), ...data };
+      localStorage.setItem(this.cacheKey, JSON.stringify(updatedData));
+      localStorage.setItem(this.cacheExpirationKey, (Date.now() + this.cacheDuration).toString());
+      this.user = updatedData;
     }
   }
 };
@@ -178,109 +276,204 @@ export default {
 
 
 
-
 <style scoped>
-/* Suppression du soulignement et couleur par défaut */
-a {
-  text-decoration: underline;
-  color: #2e2e2e; /* Bleu agréable */
-  font-weight: 600;
-  transition: color 0.3s ease-in-out;
+
+/* Champ de modification */
+.edit-input {
+  width: 100%;
+  padding: 5px;
+  font-size: 1rem;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  outline: none;
 }
 
-/* Effet au survol */
-a:hover {
-  color: #0056b3; /* Bleu plus foncé */
-  text-decoration: underline;
+/* Boutons */
+.edit-btn, .save-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  margin-top: 5px;
+  cursor: pointer;
+  border-radius: 5px;
 }
 
-/* Style des cartes */
-
-/* Augmentation de la taille et de l’espacement du texte */
-h2, h4, h5 {
-  font-size: 1.4rem;
-  letter-spacing: 0.5px;
-  margin-bottom: 3%;
+.edit-btn:hover, .save-btn:hover {
+  background: #0056b3;
 }
 
-p {
-  font-size: 1.1rem;
-  line-height: 1.6;
+
+
+
+/* Container principal */
+.espace-container {
+  max-width: 1200px;
 }
 
-/* Espacement entre les éléments */
-.info-box {
+/* Effet verre pour la carte principale */
+.glass-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
   padding: 20px;
-  margin-top: 15px;
+  transition: transform 0.3s ease-in-out;
 }
 
-/* Amélioration de la lisibilité des notifications */
-.list-group-item {
-  font-size: 1.2rem;
-  padding: 13px;
+.glass-card:hover {
+  transform: translateY(-10px); /* Légère montée au survol */
+  box-shadow: 0px 15px 25px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px); /* Blur réduit pour moins d'effet flou */
+}
+
+
+/* Conteneur de chargement */
+.loading-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
 }
 
-/* Ajout d'une icône devant chaque élément de la liste */
-.list-group-item::before {
-  content: "";
-  margin-right: 10px;
+.minimal-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #444;
+  border-bottom: 2px solid #007bff;
+  display: inline-block;
+  padding-bottom: 5px;
+}
+ 
+/* Titre cliquable */
+.clickable-title {
+  cursor: pointer;
+  text-decoration: underline;
+  color: #007bff;
+  transition: color 0.3s ease-in-out;
 }
 
-.card {
-  border-radius: 15px;
-  max-width: 1000px;
+.clickable-title:hover {
+  color: #0056b3;
+}
+
+/* Overlay (fond sombre quand la modale est ouverte) */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Contenu de la modale */
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.3);
+  position: relative;
+  text-align: left;
+}
+
+/* Bouton de fermeture */
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
 }
 
 
-/* Animation d'entrée */
-.animated-card {
-  animation: fadeIn 0.8s ease-in-out;
+/* Sections d'infos */
+.info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 /* Boîtes d'informations */
 .info-box {
-  border-left: 5px solid #5784d6;
-  padding: 15px;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+
+.goal-box {
+  background: linear-gradient(135deg, #ff4e50, #f3cd25);
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.7);
+
+  /* Centrage vertical et horizontal */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  /* Taille minimum pour un bon rendu */
+  min-height: 50px;
+  padding: 20px;
+}
+
+
+
+
+
+/* Ressources */
+.resource-box {
+  background: #ffffff;
+}
+
+.resource-item a {
+  display: block;
+  padding: 20px;
+  background: #3f3f3f;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 5px;
   margin-top: 10px;
+  transition: background 0.3s;
 }
 
-/* Effet survol boutons */
-.btn-success:hover {
-  background-color: #28a745;
-  transition: 0.3s;
+.resource-item a:hover {
+  background: #ffffff;
+  color:black;
 }
 
-/* Animation */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+/* Profil */
+.profile-box {
+  background: #fff;
+}
+.resource-separator {
+  border: none;
+  height: 1px;
+  background: radial-gradient(circle, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0) 100%);
+  width: 100%;
+}
+
+
+
+/* Responsive */
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 10px;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .info-box {
+    padding: 8px;
   }
-}
-.glass-card {
-  background: rgba(255, 255, 255, 0.2); /* Transparence légère */
-
-  border-radius: 15px; /* Coins arrondis */
-  border: 1px solid rgba(255, 255, 255, 0.3); /* Bordure fine translucide */
-  box-shadow: 0 4px 5px rgba(0, 0, 0, 0.1); /* Ombre légère */
-  transition: all 0.3s ease-in-out; /* Animation fluide */
-}
-
-/* Ajout d'un effet au survol */
-.glass-card:hover {
-  background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  transform: translateY(-3px);
 }
 </style>

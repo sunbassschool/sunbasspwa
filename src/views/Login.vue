@@ -6,14 +6,14 @@
           <div class="card shadow p-5">
             <h2 class="text-center mb-4">🔐 Connexion</h2>
 
-            <!-- 🔥 Afficher le formulaire SEULEMENT si loading est false -->
             <form v-if="!loading" @submit.prevent="login">
               <div class="mb-3">
                 <label for="email" class="form-label">Adresse e-mail</label>
                 <input 
                   v-model="email" 
                   type="email" 
-                  id="email" 
+                  id="email"
+                  name="email" 
                   class="form-control" 
                   required 
                   autocomplete="off"
@@ -26,33 +26,29 @@
                   v-model="password" 
                   type="password" 
                   id="password" 
+                  name="password"
+
                   class="form-control" 
                   required 
                   autocomplete="new-password"
                   spellcheck="false">
               </div>
 
-              <input type="password" style="display:none" autocomplete="new-password">
+              <input type="password"   name="password2"
+              style="display:none" autocomplete="new-password">
 
-              <button type="submit" class="btn btn-primary w-100">
-                Se connecter
+              <button @click="login" :disabled="loading" class="btn btn-primary w-100">
+                <span v-if="!loading">Se connecter</span>
+                <span v-else>Connexion en cours...</span>
               </button>
             </form>
 
-            <!-- 🔥 Afficher le spinner si loading est true -->
-            <div v-if="loading" class="text-center">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Connexion en cours...</span>
-              </div>
-              <p class="mt-3 fw-bold">Connexion en cours...</p>
+            <!-- Barre de chargement animée avec progression dynamique -->
+            <div v-if="loading" class="loading-container mt-3">
+              <div class="loading-bar" :style="{ width: progress + '%' }"></div>
             </div>
 
             <div v-if="message" class="alert mt-3" :class="messageType">{{ message }}</div>
-
-            <div v-if="prenom && email" class="alert alert-info mt-3">
-              ✅ Connecté en tant que {{ prenom }} ({{ email }})
-              <button @click="logout" class="btn btn-danger btn-sm ms-3">Se déconnecter</button>
-            </div>
           </div>
         </div>
       </div>
@@ -75,8 +71,11 @@ export default {
       messageType: "",
       jwt: sessionStorage.getItem("jwt") || "",  
       refreshjwt: localStorage.getItem("refreshjwt") || "",  
-      apiBaseURL: "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbxWgrMJAgTxqfWeH5lKT0LFW_rURlpmLIxKTx7CEGfuJCYd_IDVq4QnC9HWoKix4ClteA/exec",
-      loading: false
+      apiBaseURL: "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbxGCCibB7xk6fG9O_zAzlAVgiyf1AdSD58LUWV90fFWu3tHstfTqRs0KjOkSZKBGki-Rg/exec",
+      loading: false,
+      progress: 0,
+      progressInterval: null,
+      tokenCheckInterval: null,
     };
   },
   computed: {
@@ -87,30 +86,38 @@ export default {
   mounted() {
     console.log("✅ Vérification du JWT au chargement...");
     this.checkExistingSession();
+
+    // Vérifie l'expiration du JWT toutes les 60 secondes
+    this.tokenCheckInterval = setInterval(this.checkTokenExpiration, 60000);
+  },
+  beforeUnmount() {
+    clearInterval(this.tokenCheckInterval);
   },
   methods: {
     async sha256(text) {
       const encoder = new TextEncoder();
       const data = encoder.encode(text);
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
     },
 
     async login() {
       if (!this.email || !this.password) {
-        this.message = "Veuillez remplir tous les champs.";
-        this.messageType = "alert-danger";
+        this.setMessage("Veuillez remplir tous les champs.", "alert-danger");
         return;
       }
 
+      this.loading = true;
+      this.progress = 0;
+      this.startProgressBar();
+      const startTime = performance.now();
       const hashedPassword = await this.sha256(this.password);
-
-      this.loading = true;  // Début de la connexion
 
       try {
         console.log("📡 Envoi de la requête de connexion...");
-        const response = await fetch(`${this.apiBaseURL}`, {
+        const response = await fetch(this.apiBaseURL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -124,41 +131,56 @@ export default {
         });
 
         const data = await response.json();
+        const duration = (performance.now() - startTime).toFixed(2);
+        console.log(`⏳ Temps de connexion : ${duration} ms`);
         console.log("🔍 Réponse API :", data);
 
         if (data.status === 'error') {
-          this.message = `❌ ${data.message}`;
-          this.messageType = "alert-danger";
+          this.setMessage(`❌ ${data.message}`, "alert-danger");
         } else {
-          // ✅ Stockage des tokens
-          sessionStorage.setItem("jwt", data.data.jwt);
-          localStorage.setItem("refreshjwt", data.data.refreshToken);
-          this.jwt = data.data.jwt;
-          this.refreshjwt = data.data.refreshToken;
-
-          // ✅ Décoder le JWT pour récupérer les infos utilisateur
-          this.decodeJWT(data.data.jwt);
-
-          this.message = "✅ Connexion réussie";
-          this.messageType = "alert-success";
-
-          // 🔥 Redirection après connexion
+          this.storeSession(data.data);
+          this.setMessage("✅ Connexion réussie", "alert-success");
           this.$router.push('/dashboard');
         }
       } catch (error) {
         console.error("🚨 Erreur lors de la connexion :", error);
-        this.message = `Erreur de connexion : ${error.message}`;
-        this.messageType = "alert-danger";
+        this.setMessage(`Erreur de connexion : ${error.message}`, "alert-danger");
       } finally {
-        this.loading = false;  // Fin de la connexion
+        this.finishProgressBar();
       }
+    },
+
+    startProgressBar() {
+      this.progress = 0;
+      this.progressInterval = setInterval(() => {
+        if (this.progress < 90) {
+          this.progress += Math.random() * 10;
+        }
+      }, 500);
+    },
+
+    finishProgressBar() {
+      clearInterval(this.progressInterval);
+      this.progress = 100;
+      setTimeout(() => {
+        this.loading = false;
+        this.progress = 0;
+      }, 300);
+    },
+
+    storeSession(data) {
+      sessionStorage.setItem("jwt", data.jwt);
+      localStorage.setItem("jwt", data.jwt); // ✅ Stockage persistant
+      localStorage.setItem("refreshjwt", data.refreshToken);
+      this.jwt = data.jwt;
+      this.refreshjwt = data.refreshToken;
+      this.decodeJWT(data.jwt);
     },
 
     decodeJWT(jwt) {
       try {
         const decoded = jwtDecode(jwt);
         console.log("🎫 JWT décodé :", decoded);
-
         sessionStorage.setItem("prenom", decoded.prenom || "");
         sessionStorage.setItem("email", decoded.email || "");
       } catch (error) {
@@ -171,26 +193,103 @@ export default {
       if (jwt) {
         console.log("🔄 Décodage du JWT pour récupérer les infos...");
         this.decodeJWT(jwt);
+        this.checkTokenExpiration();
+      }
+    },
+
+    checkTokenExpiration() {
+      if (!this.jwt) return;
+
+      try {
+        const decoded = jwtDecode(this.jwt);
+        const expTime = decoded.exp * 1000; // Convertir en millisecondes
+        const currentTime = Date.now();
+
+        if (currentTime >= expTime) {
+          console.log("🔄 Le JWT a expiré. Tentative de rafraîchissement...");
+          this.refreshToken();
+        }
+      } catch (error) {
+        console.error("❌ Erreur lors de la vérification du JWT :", error);
+        this.logout();
+      }
+    },
+
+    async refreshToken() {
+      if (!this.refreshjwt) {
+        console.log("❌ Aucun refresh token disponible.");
+        this.logout();
+        return;
+      }
+
+      try {
+        const response = await fetch(this.apiBaseURL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            route: "refreshToken",
+            refreshToken: this.refreshjwt,
+          }),
+        });
+
+        const data = await response.json();
+        if (data.status === "success") {
+          console.log("✅ JWT rafraîchi !");
+          this.storeSession(data.data);
+        } else {
+          console.error("🚨 Impossible de rafraîchir le JWT :", data.message);
+          this.logout();
+        }
+      } catch (error) {
+        console.error("🚨 Erreur lors du rafraîchissement du JWT :", error);
+        this.logout();
       }
     },
 
     logout() {
-      sessionStorage.clear(); 
+      sessionStorage.clear();
       localStorage.removeItem("refreshjwt");
-
       this.jwt = "";
       this.refreshjwt = "";
-
-      this.message = "Vous êtes déconnecté.";
-      this.messageType = "alert-info";
-
+      this.setMessage("Vous êtes déconnecté.", "alert-info");
       this.$router.push('/login');
+    },
+
+    setMessage(msg, type) {
+      this.message = msg;
+      this.messageType = type;
     }
   }
 };
 </script>
 
+
+
 <style scoped>
+
+.loading-container {
+  width: 100%;
+  height: 4px;
+  background-color: #f0f0f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loading-bar {
+  height: 100%;
+  background-color: #ff5e00 !important; /* Forçage de la couleur */
+  transition: width 0.3s ease-in-out;
+}
+
+
+@keyframes loadingAnimation {
+  0% { width: 0; }
+  50% { width: 100%; }
+  100% { width: 0; }
+}
+
 /* Largeur et centrage */
 .card {
   border-radius: 10px;

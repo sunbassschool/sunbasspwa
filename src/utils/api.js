@@ -1,8 +1,9 @@
 export async function fetchWithAuth(url, method = "GET", body = null, attempt = 1) {
     let token = localStorage.getItem("jwt") || sessionStorage.getItem("jwt"); // 🔥 Harmonisation avec login()
 
-    if (!token) {
-        console.warn("⚠️ Pas de token disponible. Tentative de rafraîchissement...");
+    // ✅ Vérifier si le token est expiré AVANT d'envoyer la requête
+    if (!token || isJwtExpired(token)) {
+        console.warn("⚠️ Token expiré ou manquant. Tentative de rafraîchissement...");
         token = await refreshToken();
         if (!token) {
             console.error("🚨 Échec du rafraîchissement, déconnexion.");
@@ -45,10 +46,25 @@ export async function fetchWithAuth(url, method = "GET", body = null, attempt = 
         return data;
     } catch (error) {
         console.error("🚨 Erreur API :", error);
-        return { error: "Erreur de connexion au serveur." };
+
+        // ✅ Vérifie si l'utilisateur est hors ligne
+        if (!navigator.onLine) {
+            return { error: "Aucune connexion Internet." };
+        }
+
+        return { error: "Erreur de connexion au serveur. Veuillez réessayer plus tard." };
     }
 }
 
+// ✅ Vérifie si un JWT est expiré avant de l'utiliser
+function isJwtExpired(token) {
+    try {
+        const payload = JSON.parse(atob(token.split(".")[1])); // Décode le JWT
+        return payload.exp * 1000 < Date.now(); // Compare l'expiration avec l'heure actuelle
+    } catch (e) {
+        return true; // Si une erreur survient, on considère le JWT comme expiré
+    }
+}
 
 export async function refreshToken() {
     const email = sessionStorage.getItem("email");
@@ -84,12 +100,13 @@ export async function refreshToken() {
 
 export function logout() {
     console.warn("👋 Déconnexion en cours...");
-    sessionStorage.removeItem("prenom");
-    sessionStorage.removeItem("email");
-    sessionStorage.removeItem("jwt");
-    localStorage.removeItem("refreshjwt"); // 🔥 Correspondance avec login()
 
-    window.location.href = "/login"; // 🔥 Redirection immédiate vers la page de connexion
+    sessionStorage.clear();
+    localStorage.clear();
+
+    setTimeout(() => {
+        window.location.href = "/login"; // 🔥 Redirection après nettoyage des données
+    }, 500);
 }
 
 /**

@@ -1,22 +1,21 @@
-import './assets/main.css'
-import 'bootstrap/dist/css/bootstrap.min.css'
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from './App.vue';
+import router from './router';
 
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import './assets/main.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import '@fortawesome/fontawesome-free/css/all.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
-import '@fortawesome/fontawesome-free/css/all.css'
-import 'bootstrap-icons/font/bootstrap-icons.css'
+import { refreshToken } from './utils/api'; // 🔥 Vérifie bien que le chemin est correct
 
-import App from './App.vue'
-import router from './router'
-import { refreshToken } from './utils/api.js' // 🔥 Import du refreshToken
+const app = createApp(App);
 
-const app = createApp(App)
+app.use(createPinia());
+app.use(router);
 
-app.use(createPinia())
-app.use(router)
-
-app.mount('#app')
+app.mount('#app'); // ✅ Vérifie bien que ton index.html contient un élément avec id="app"
 
 // ✅ Vérification du token au démarrage
 (async () => {
