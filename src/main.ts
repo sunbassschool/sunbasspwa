@@ -16,6 +16,28 @@ app.use(createPinia());
 app.use(router);
 
 app.mount('#app'); // ✅ Vérifie bien que ton index.html contient un élément avec id="app"
+// 🔄 Vérification et rafraîchissement automatique du JWT
+setInterval(async () => {
+  let jwt = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
+
+  if (jwt) {
+    const payload = JSON.parse(atob(jwt.split(".")[1])); // Décode le JWT
+    const expirationTime = payload.exp * 1000; // Convertir en millisecondes
+    const timeLeft = expirationTime - Date.now(); // Temps restant avant expiration
+
+    console.log(`⏳ Temps restant avant expiration du JWT : ${timeLeft / 1000} secondes`);
+
+    if (timeLeft < 120000) { // 🔥 Si le JWT expire dans moins de 2 minutes (120000 ms)
+      console.log("🔄 Rafraîchissement du JWT avant expiration...");
+      const newJwt = await refreshToken();
+      if (newJwt) {
+        console.log("✅ JWT rafraîchi automatiquement !");
+      } else {
+        console.warn("🚨 Impossible de rafraîchir le JWT, utilisateur peut être déconnecté.");
+      }
+    }
+  }
+}, 60000); // ⏳ Vérifie toutes les 60 secondes
 
 // ✅ Vérification du token au démarrage
 (async () => {

@@ -11,6 +11,8 @@ import Login from '@/views/Login.vue'
 import MonEspace from '@/views/MonEspace.vue'
 import RegisterForm from '@/views/RegisterForm.vue'
 import Prendreuncours from '@/views/Prendreuncours.vue'
+import RegisterCursus from "../views/RegisterCursus.vue"
+import CreatePlanning from "@/views/CreatePlanning.vue";
 import { refreshToken } from '@/utils/api'
 
 const baseUrl = import.meta.env.MODE === "production" ? "/app/" : "/";
@@ -22,6 +24,17 @@ const router = createRouter({
       path: '/',
       redirect: { name: 'intro' }
     },
+    {
+      path: "/register-cursus",
+      name: "RegisterCursus",
+      component: RegisterCursus,
+    },
+    {
+      path: "/create-planning",
+      name: "CreatePlanning",
+      component: () => import("@/views/CreatePlanning.vue"),
+    },
+    
     {
       path: '/mon-espace',
       name: 'mon-espace',

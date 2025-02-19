@@ -36,6 +36,9 @@
             <i class="bi bi-person-circle"></i>
             <span>Mon Espace</span>
           </router-link>
+
+         
+
         </div>
       </div>
     </header>
@@ -47,6 +50,13 @@
         <i class="bi bi-person-circle"></i>
         <span>Mon Espace</span>
       </router-link>
+      <router-link to="/register-cursus" class="nav-link mon-espace">
+        <i class="bi bi-person-plus"></i>
+       S'inscrire à un <br />cursus
+</router-link>
+<router-link to="/create-planning" class="nav-link mon-espace">
+  <i class="bi bi-calendar-plus"></i> Créer un Planning
+</router-link>
 
       <button v-if="isLoggedIn" @click="logout" class="nav-link logout">
         <i class="bi bi-box-arrow-right"></i> 
@@ -55,7 +65,8 @@
     </div>
 
     <!-- ✅ Contenu principal -->
-    <main class="page-content">
+    <main class="page-content" :class="{ 'fullwidth': isFullScreenPage }">
+
       <slot></slot>
     </main>
 
@@ -75,6 +86,10 @@
               <span>Partitions</span>
             </router-link>
           </li>
+          <router-link v-if="!isLoggedIn" to="/registerform" class="nav-link btn-register">
+  <i class="bi bi-person-plus"></i>
+  <span>S'inscrire</span>
+</router-link>
 
           <!-- ✅ Planning et Replay uniquement si connecté -->
           <li v-if="isLoggedIn" class="nav-item">
@@ -114,15 +129,21 @@ export default {
   data() {
     return {
       jwt: sessionStorage.getItem("jwt") || localStorage.getItem("jwt") || "",
+      refreshjwt: localStorage.getItem("refreshjwt") || "",
       showMenu: false,
       isMobile: window.innerWidth < 768,
+      isLoading: false,
       showInstallButton: false,
-      deferredPrompt: null
+      deferredPrompt: null,
+      tokenCheckInterval: null, // 🔄 Vérification de l'expiration du JWT
+      apiBaseURL:
+        "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbxGCCibB7xk6fG9O_zAzlAVgiyf1AdSD58LUWV90fFWu3tHstfTqRs0KjOkSZKBGki-Rg/exec",
+      fullScreenPages: ["/register-cursus"], // ✅ Tableau statique ici
     };
   },
   computed: {
     isLoggedIn() {
-      return !!this.jwt; // ✅ Devient réactif, Vue mettra à jour les boutons automatiquement
+      return !!this.jwt;
     },
     prenom() {
       return sessionStorage.getItem("prenom") || "";
@@ -138,11 +159,19 @@ export default {
     },
     showResponsiveLogo() {
       return !this.isLoggedIn && this.isMobile;
-    }
+    },
+    isFullScreenPage() {
+      return !this.isMobile && this.fullScreenPages.includes(this.$route.path);
+    },
   },
   mounted() {
     console.log("✅ Vérification de la session existante...");
-    this.checkExistingSession();
+
+    setTimeout(() => {
+      this.checkExistingSession();
+    }, 500); // ✅ Correction de l'erreur de syntaxe
+
+    this.tokenCheckInterval = setInterval(this.checkTokenExpiration, 60000); // Vérification toutes les 60s
 
     window.addEventListener("resize", this.checkMobile);
     window.addEventListener("beforeinstallprompt", (event) => {
@@ -152,6 +181,7 @@ export default {
     });
   },
   beforeUnmount() {
+    clearInterval(this.tokenCheckInterval);
     window.removeEventListener("resize", this.checkMobile);
   },
   methods: {
@@ -170,38 +200,41 @@ export default {
       this.isMobile = window.innerWidth < 768;
     },
     checkExistingSession() {
-      let jwt = sessionStorage.getItem("jwt") || localStorage.getItem("jwt");
+  let jwt = sessionStorage.getItem("jwt");
 
-      if (!jwt) {
-        console.warn("⚠️ Aucun JWT trouvé. L'utilisateur doit se reconnecter.");
-        return;
-      }
+  if (!jwt) {
+    console.warn("⚠️ Aucun JWT trouvé. L'utilisateur doit se reconnecter.");
+    return;
+  }
 
-      try {
-        const decoded = jwtDecode(jwt);
+  try {
+    const decoded = jwtDecode(jwt);
 
-        // Vérifie si le JWT est expiré
-        if (decoded.exp * 1000 < Date.now()) {
-          console.warn("⚠️ JWT expiré. Suppression du cache et redirection vers /login.");
-          this.logout();
-          return;
-        }
+    // 🔥 Vérifier l'expiration du JWT
+    if (decoded.exp * 1000 < Date.now()) {
+      console.warn("⏳ JWT expiré. Tentative de rafraîchissement...");
+      this.refreshToken();
+      return; // 🚨 Important : arrêter l'exécution ici !
+    }
 
-        console.log("✅ JWT valide, restauration de la session...");
-        sessionStorage.setItem("jwt", jwt);
-        this.jwt = jwt; // ✅ Mise à jour réactive
-        this.decodeJWT(jwt);
+    console.log("✅ JWT valide, restauration de la session...");
+    this.jwt = jwt;
+    this.decodeJWT(jwt);
 
-      } catch (error) {
-        console.error("🚨 JWT corrompu ou invalide :", error);
-        this.logout();
-      }
-    },
+  } catch (error) {
+    console.error("🚨 Erreur lors du décodage du JWT :", error);
+    
+    // 🔥 Déconnexion propre en cas de JWT corrompu ou invalide
+    this.logout();
+  }
+}
+,
     storeSession(data) {
       sessionStorage.setItem("jwt", data.jwt);
       localStorage.setItem("jwt", data.jwt);
       localStorage.setItem("refreshjwt", data.refreshToken);
-      this.jwt = data.jwt; // ✅ Mise à jour réactive
+      this.jwt = data.jwt;
+      this.refreshjwt = data.refreshToken;
       this.decodeJWT(data.jwt);
     },
     decodeJWT(jwt) {
@@ -214,14 +247,67 @@ export default {
         console.error("🚨 Erreur lors du décodage du JWT :", error);
       }
     },
+    checkTokenExpiration() {
+      if (!this.jwt) return;
+
+      try {
+        const decoded = jwtDecode(this.jwt);
+        const expTime = decoded.exp * 1000;
+        const currentTime = Date.now();
+        const timeLeft = expTime - currentTime;
+
+        if (timeLeft < 5 * 60 * 1000) {
+          console.log("🕒 JWT proche de l'expiration, rafraîchissement en cours...");
+          this.refreshToken();
+        } else {
+          console.log(`🕒 JWT valide encore pour ${Math.floor(timeLeft / 1000)} secondes`);
+        }
+      } catch (error) {
+        console.error("❌ Erreur lors de la vérification du JWT :", error);
+        this.logout();
+      }
+    },
+    async refreshToken() {
+      if (!this.refreshjwt) {
+        console.log("❌ Aucun refresh token disponible.");
+        this.logout();
+        return;
+      }
+
+      try {
+        console.log("🔄 Tentative de rafraîchissement du JWT...");
+        const response = await fetch(this.apiBaseURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            route: "refreshToken",
+            refreshToken: this.refreshjwt,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.status === "success") {
+          console.log("✅ JWT rafraîchi !");
+          this.storeSession(data.data);
+        } else {
+          console.error("🚨 Impossible de rafraîchir le JWT :", data.message);
+          this.logout();
+        }
+      } catch (error) {
+        console.error("🚨 Erreur lors du rafraîchissement du JWT :", error);
+        this.logout();
+      }
+    },
     logout() {
       console.log("🚪 Déconnexion en cours...");
 
       sessionStorage.clear();
       localStorage.removeItem("jwt");
-      localStorage.removeItem("refreshjwt");
+      
 
-      this.jwt = ""; // ✅ Mise à jour réactive pour cacher les boutons instantanément
+      this.jwt = "";
+      this.refreshjwt = "";
       console.log("🔀 Redirection vers /login...");
       this.$router.push("/login");
 
@@ -237,10 +323,11 @@ export default {
           this.showInstallButton = false;
         });
       }
-    }
-  }
+    },
+  },
 };
 </script>
+
 
 
 
@@ -337,6 +424,12 @@ export default {
 .btn-cours:hover {
   background-color: #ffdd57;
 }
+.fullwidth {
+  max-width: 100vw;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
 
 /* ✅ STYLE DES AUTRES BOUTONS */
 .nav-link {
@@ -374,11 +467,13 @@ export default {
 .page-content {
   flex-grow: 1;
   overflow-y: auto;
-  overflow-x: hidden;
   padding-top: 100px;
   padding-bottom: 70px;
   background-color: #f8f9fa;
+  max-width: 100vw;
+  width: 100%;
 }
+
 
 /* ✅ MENU FIXE EN BAS */
 .navbar-container {
@@ -491,7 +586,26 @@ export default {
   color: black;
 }
 
+.fullscreen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
 
+.fullscreen .page-content {
+  flex-grow: 1;
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.fullscreen header,
+.fullscreen footer {
+  display: none;
+}
 
 @media screen and (max-width: 768px) {
   .hero-banner {

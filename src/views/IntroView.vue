@@ -42,7 +42,7 @@ onMounted(() => {
 const goToDashboard = () => {
   showModal.value = false;
   setTimeout(() => {
-    router.push("/dashboard"); // Redirection vers le tableau de bord
+    router.push("/mon-espace"); // Redirection vers le tableau de bord
   }, 800); // Délai avant la redirection
 };
 </script>

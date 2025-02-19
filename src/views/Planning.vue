@@ -28,8 +28,15 @@
 
       <!-- ✅ Message si aucun cours trouvé, mais seulement après le chargement -->
       <div v-if="!loading && planningData.length === 0 && isLoggedIn" class="alert alert-warning text-center mt-3">
-        Aucun cours trouvé pour ton compte.
-      </div>
+  <p class="mb-2">Aucun cours trouvé pour ton compte.</p>
+  <a href="https://www.sunbassschool.com/step/inscription-aux-cours-en-visio/" 
+     class="btn btn-primary mt-2" 
+     target="_blank" 
+     rel="noopener noreferrer">
+    📅 Réserver un cours maintenant
+  </a>
+</div>
+
 
       <!-- ✅ Tableau des cours, affiché uniquement après le chargement -->
       <div v-if="!loading && planningData.length > 0" class="table-responsive mt-3">
@@ -72,17 +79,32 @@ export default {
 
     // ✅ Vérifie si l'utilisateur est connecté
     const isLoggedIn = computed(() => {
-      const jwt = sessionStorage.getItem("jwt");
-      if (!jwt) return false;
+  let jwt = sessionStorage.getItem("jwt");
 
-      try {
-        const decoded = jwtDecode(jwt);
-        return decoded.exp * 1000 > Date.now();
-      } catch (error) {
-        console.error("🚨 JWT invalide :", error);
-        return false;
-      }
-    });
+  console.log("🔍 Vérification JWT dans sessionStorage :", jwt);
+
+  // 🚀 Vérifier aussi dans localStorage si jamais il a été restauré récemment
+  if (!jwt) {
+    console.log("⚠️ Aucun JWT en sessionStorage, tentative de récupération depuis localStorage...");
+    jwt = localStorage.getItem("jwt");
+
+    if (jwt) {
+      sessionStorage.setItem("jwt", jwt); // 🔄 Restaurer dans sessionStorage
+      console.log("✅ JWT restauré depuis localStorage :", jwt);
+    } else {
+      console.warn("❌ Aucun JWT trouvé.");
+      return false;
+    }
+  }
+
+  try {
+    const decoded = jwtDecode(jwt);
+    return decoded.exp * 1000 > Date.now(); // 🔥 Vérifie si le JWT est expiré
+  } catch (error) {
+    console.error("🚨 JWT invalide :", error);
+    return false;
+  }
+});
 
     // ✅ Récupère l'email et prénom depuis le JWT
     const email = computed(() => sessionStorage.getItem("email") || "");
@@ -112,11 +134,20 @@ export default {
 
     // ✅ Vérifie si les données en cache sont valides
     const isCacheValid = (data) => {
-      return (
-        Array.isArray(data) &&
-        data.length > 0 &&
-        data.every(item => item && typeof item === "object" && "date" in item && "meet" in item)
-      );
+      if (!data || typeof data !== "object") return false;
+
+      // 🚨 Vérifier si l'API a renvoyé une erreur
+      if (data.status === "error" || data.error) {
+        if (data.error === "Aucun lien Meet trouvé") {
+          console.warn("⚠️ Avertissement : Aucun lien Meet trouvé, mais ce n'est pas une erreur bloquante.");
+          return true; // ✅ On garde les autres données du cache
+        }
+        console.error("❌ Cache invalide détecté :", data.error || data.message);
+        return false;
+      }
+
+      // ✅ Vérifie si les données sont valides
+      return Array.isArray(data) && data.every(item => item && typeof item === "object" && "date" in item);
     };
 
     const fetchPlanningData = async () => {
@@ -129,56 +160,64 @@ export default {
       const cacheTimestampKey = `${cacheKey}_timestamp`;
       const cachedData = localStorage.getItem(cacheKey);
       const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
-      const cacheExpired = !cacheTimestamp || Date.now() - cacheTimestamp > cacheDuration;
+      const cacheTimestampNumber = parseInt(cacheTimestamp, 10) || 0;
+      const cacheExpired = !cacheTimestampNumber || Date.now() - cacheTimestampNumber > cacheDuration;
 
+      // 🔍 Vérifier si le cache est valide avant d'appeler l'API
       if (cachedData && !cacheExpired) {
         try {
+          console.log("📦 Contenu brut du cache avant parsing :", cachedData);
           const parsedData = JSON.parse(cachedData);
 
           if (isCacheValid(parsedData)) {
-            console.log("⚡ Chargement du planning depuis le cache");
-            planningData.value = parsedData.map(item => ({
-              date: item.date,
-              formattedDate: formatDate(item.date),
-              meet: item.meet,
-            }));
+            console.log("⚡ Chargement du planning depuis le cache !");
+            planningData.value = Array.isArray(parsedData) ? parsedData : [];
             loading.value = false;
             return;
           } else {
             console.warn("🚨 Cache invalide ou incomplet, récupération depuis l'API...");
           }
         } catch (error) {
-          console.warn("❌ Erreur de parsing du cache, suppression...");
-          localStorage.removeItem(cacheKey);
-          localStorage.removeItem(cacheTimestampKey);
+          console.error("❌ Erreur de parsing du cache :", error);
+          console.log("📦 Données brutes du cache corrompu :", cachedData);
+          return; // 🔥 NE PAS SUPPRIMER AUTOMATIQUEMENT
         }
       }
 
-      if (cacheExpired) {
-        console.log("🔄 Cache expiré, récupération des nouvelles données...");
-        localStorage.removeItem(cacheKey);
-        localStorage.removeItem(cacheTimestampKey);
-      }
-
+      // 🔄 Si le cache est expiré, récupérer les nouvelles données depuis l'API
+      console.log("🔄 Cache expiré, récupération des nouvelles données...");
       try {
         console.log("🌐 Requête envoyée :", `${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
         const response = await axios.get(`${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
 
-        console.log("✅ Données reçues :", response.data);
+        console.log("✅ Réponse complète de l'API :", response.data);
+        let processedData;
 
-        if (isCacheValid(response.data)) {
-          planningData.value = response.data.map(item => ({
+        // ✅ Si l'API renvoie un tableau (données valides)
+        if (Array.isArray(response.data)) {
+          processedData = response.data.map(item => ({
             date: item.date,
             formattedDate: formatDate(item.date),
-            meet: item.meet,
+            meet: item.meet || "⚠️ Lien Meet non disponible",
           }));
-
-          localStorage.setItem(cacheKey, JSON.stringify(planningData.value));
-          localStorage.setItem(cacheTimestampKey, Date.now());
         } else {
-          console.error("❌ Données reçues invalides");
-          alert("Erreur lors du chargement des cours.");
+          // ✅ Si l'API renvoie un objet (ex: erreur), on stocke quand même
+          console.warn("⚠️ API a renvoyé un objet, stockage du message d'erreur.");
+          processedData = response.data;
         }
+
+        // ✅ Enregistrer le cache même si c'est un message d'erreur
+        localStorage.setItem(cacheKey, JSON.stringify(processedData));
+        localStorage.setItem(cacheTimestampKey, Date.now().toString());
+        console.log("✅ Données enregistrées dans le cache :", localStorage.getItem(cacheKey));
+
+        // ✅ Si ce sont des cours valides, on met à jour l'affichage
+        if (Array.isArray(processedData)) {
+          planningData.value = processedData;
+        } else {
+          console.warn("⚠️ Aucun cours trouvé, affichage du message d'erreur.");
+        }
+
       } catch (error) {
         console.error("❌ Erreur lors du chargement des cours :", error);
         alert("Une erreur est survenue lors du chargement de ton planning.");
@@ -210,6 +249,7 @@ export default {
 
 
 
+
 <style scoped>
 /* ✅ Style amélioré */
 h2 {
@@ -217,12 +257,33 @@ h2 {
   color: #343a40;
 }
 
+/* ✅ Conteneur principal en pleine largeur */
+.container-xxl {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+/* ✅ S'assurer que tout le contenu est bien aligné sur toute la largeur */
+.container-xxl > div {
+  width: 100%;
+}
+
+/* ✅ Rendre le tableau fluide en responsive */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* ✅ Meilleure lisibilité du tableau */
 .table {
   border-radius: 10px;
   overflow: hidden;
+  width: 100%;
+  font-size: 1rem;
 }
 
-/* ✅ Meilleure lisibilité sur mobile */
 .table th, .table td {
   padding: 15px;
   text-align: center;
@@ -241,9 +302,48 @@ h2 {
   cursor: pointer;
 }
 
-/* ✅ Gestion des erreurs */
+/* ✅ Messages d'alerte en pleine largeur */
 .alert {
+  width: 100%;
   font-weight: bold;
   font-size: 1.1rem;
+  text-align: center;
+  padding: 20px;
+}
+
+/* ✅ Boutons en pleine largeur sur petits écrans */
+.d-flex.justify-content-center.gap-3 {
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.d-flex.justify-content-center.gap-3 .btn {
+  flex: 1;
+  min-width: 150px;
+  max-width: 300px;
+  text-align: center;
+}
+
+/* ✅ Adaptation mobile (≤ 768px) */
+@media (max-width: 768px) {
+  .table th, .table td {
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+}
+
+/* ✅ Adaptation très petits écrans (≤ 576px) */
+@media (max-width: 576px) {
+  .container-xxl {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+
+  .alert {
+    font-size: 1rem;
+    padding: 10px;
+  }
 }
 </style>
+
