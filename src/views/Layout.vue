@@ -137,7 +137,7 @@ export default {
       deferredPrompt: null,
       tokenCheckInterval: null, // 🔄 Vérification de l'expiration du JWT
       apiBaseURL:
-        "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbxGCCibB7xk6fG9O_zAzlAVgiyf1AdSD58LUWV90fFWu3tHstfTqRs0KjOkSZKBGki-Rg/exec",
+        "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbySfC71M5ThshHntBVXvf3g0ggo9ruMqHngNUG56SLweACEv3eHRI__uloWW0M2zekfvA/exec",
       fullScreenPages: ["/register-cursus"], // ✅ Tableau statique ici
     };
   },
@@ -210,11 +210,10 @@ export default {
   try {
     const decoded = jwtDecode(jwt);
 
-    // 🔥 Vérifier l'expiration du JWT
     if (decoded.exp * 1000 < Date.now()) {
       console.warn("⏳ JWT expiré. Tentative de rafraîchissement...");
       this.refreshToken();
-      return; // 🚨 Important : arrêter l'exécution ici !
+      return;
     }
 
     console.log("✅ JWT valide, restauration de la session...");
@@ -223,11 +222,18 @@ export default {
 
   } catch (error) {
     console.error("🚨 Erreur lors du décodage du JWT :", error);
-    
-    // 🔥 Déconnexion propre en cas de JWT corrompu ou invalide
-    this.logout();
+    console.warn("❌ JWT invalide ou corrompu, mais pas de déconnexion forcée immédiate.");
+
+    // 🔥 Option : Plutôt qu'un logout immédiat, on peut supprimer uniquement le JWT et forcer une reconnexion
+    sessionStorage.removeItem("jwt");
+    localStorage.removeItem("jwt");
+    this.jwt = "";
+
+    // Possibilité de rediriger vers la page de login sans déconnecter totalement
+    this.$router.push("/login");
   }
 }
+
 ,
     storeSession(data) {
       sessionStorage.setItem("jwt", data.jwt);
@@ -280,7 +286,7 @@ export default {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            route: "refreshToken",
+            route: "refresh",
             refreshToken: this.refreshjwt,
           }),
         });

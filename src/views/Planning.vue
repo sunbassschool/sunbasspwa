@@ -75,7 +75,8 @@ export default {
     const loading = ref(true);
 
     const API_URL = "https://script.google.com/macros/s/AKfycbzGV13_iuC5shxErpbzwJoRBLGPHsH5osBvw0K2M_xh_TsJx9P0Fq1A0_1S4XDd0AW3nA/exec";
-    const cacheDuration = 5 * 60 * 1000; // 5 minutes
+    const cacheDuration = 24 * 60 * 60 * 1000; // 24 heures
+
 
     // ✅ Vérifie si l'utilisateur est connecté
     const isLoggedIn = computed(() => {

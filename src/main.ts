@@ -29,7 +29,11 @@ setInterval(async () => {
 
     if (timeLeft < 120000) { // 🔥 Si le JWT expire dans moins de 2 minutes (120000 ms)
       console.log("🔄 Rafraîchissement du JWT avant expiration...");
-      const newJwt = await refreshToken();
+      const newJwt = await refreshToken().catch(err => {
+        console.error("❌ Erreur lors du rafraîchissement du JWT :", err);
+        return null;
+      });
+      
       if (newJwt) {
         console.log("✅ JWT rafraîchi automatiquement !");
       } else {

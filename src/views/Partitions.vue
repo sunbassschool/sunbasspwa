@@ -90,7 +90,8 @@ export default {
     const RANGE = "'partitions'!A2:J";
 
     // ⏳ Définition de la durée du cache (5 minutes)
-    const cacheDuration = 5 * 60 * 1000; 
+    const cacheDuration = 24 * 60 * 60 * 1000; // 24 heures
+ 
 
     const fetchPartitions = async () => {
       const cacheKey = "partitions_cache";

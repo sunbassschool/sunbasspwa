@@ -1,6 +1,9 @@
 const PROXY_URL = "https://cors-proxy-37yu.onrender.com/";
 const API_BASE_URL = "https://script.google.com/macros/s/AKfycbySfC71M5ThshHntBVXvf3g0ggo9ruMqHngNUG56SLweACEv3eHRI__uloWW0M2zekfvA/exec";
 
+// ✅ Exportation des fonctions principales
+
+
 export async function fetchWithAuth(url, method = "GET", body = null, attempt = 1) {
     let token = getToken();
 
@@ -12,9 +15,6 @@ export async function fetchWithAuth(url, method = "GET", body = null, attempt = 
         token = await refreshToken();
         if (!token) {
             console.error("🚨 Échec du rafraîchissement, déconnexion forcée.");
-            console.warn("🛑 refreshToken a échoué ! JWT supprimé ?");
-            console.warn("📦 RefreshToken AVANT suppression :", localStorage.getItem("refreshjwt"));
-
             logout();
             return { error: "Session expirée." };
         }
@@ -82,56 +82,37 @@ function isJwtExpired(token) {
 }
 
 export async function refreshToken() {
-    const email = sessionStorage.getItem("email");
-    const storedRefreshToken = localStorage.getItem("refreshjwt");
+    if (window.refreshingToken) {
+        console.warn("🔄 Une tentative de refresh est déjà en cours...");
+        return null;
+    }
 
-    console.log("📦 RefreshToken AVANT envoi :", storedRefreshToken ? `✅ ${storedRefreshToken}` : "❌ Absent");
+    window.refreshingToken = true; // Empêche plusieurs refresh en parallèle
+    
+    const email = sessionStorage.getItem("email");
+    let storedRefreshToken = localStorage.getItem("refreshjwt");
 
     if (!email || !storedRefreshToken) {
         console.warn("⚠️ Impossible de rafraîchir le token : informations manquantes.");
         logout(false);
+        window.refreshingToken = false;
         return null;
     }
 
     try {
-        console.log("🔄 Demande de refresh du token...");
-
         const url = `${PROXY_URL}${API_BASE_URL}?route=refresh&email=${encodeURIComponent(email)}&refreshToken=${encodeURIComponent(storedRefreshToken)}`;
-        console.log("🌎 Requête envoyée à :", url);
-
         const response = await fetch(url);
         const data = await response.json();
 
-        console.log("✅ Réponse API du refresh :", data);
-
         if (data.status === "success" && data.data.jwt) {
-            console.log("🔄 ✅ Nouveau JWT reçu :", data.data.jwt);
-
-            console.log("🔄 📦 RefreshToken RENVOYÉ PAR L'API :", data.data.refreshToken ? `✅ ${data.data.refreshToken}` : "❌ Non fourni");
-
-            // ✅ Comparer l'ancien et le nouveau refreshToken
-            if (data.data.refreshToken) {
-                if (data.data.refreshToken !== storedRefreshToken) {
-                    console.error("🛑 MISMATCH ENTRE LES REFRESH TOKENS !");
-                    console.warn(`🆕 RefreshToken reçu: ${data.data.refreshToken}`);
-                    console.warn(`🔄 RefreshToken stocké: ${storedRefreshToken}`);
-                }
-
-                // 🔄 Mise à jour du refreshToken
-                localStorage.setItem("refreshjwt", data.data.refreshToken);
-                console.log("🔄 ✅ RefreshToken mis à jour !");
-            } else {
-                console.warn("⚠️ Aucun nouveau refreshToken reçu !");
-            }
-
-            // ✅ Stockage du nouveau JWT
             localStorage.setItem("jwt", data.data.jwt);
             sessionStorage.setItem("jwt", data.data.jwt);
-            
-            // 🚀 Vérification immédiate
-            console.log("📦 JWT après stockage :", localStorage.getItem("jwt"));
-            console.log("📦 RefreshToken après stockage :", localStorage.getItem("refreshjwt"));
 
+            if (data.data.refreshToken && data.data.refreshToken !== storedRefreshToken) {
+                localStorage.setItem("refreshjwt", data.data.refreshToken);
+            }
+
+            console.log("✅ Token rafraîchi avec succès !");
             return data.data.jwt;
         } else {
             console.error("🚨 Rafraîchissement échoué :", data);
@@ -139,12 +120,35 @@ export async function refreshToken() {
             return null;
         }
     } catch (error) {
-        console.error("🚨 Erreur lors du rafraîchissement du token :", error);
+        console.error("🚨 Erreur lors du rafraîchissement :", error);
         logout();
         return null;
+    } finally {
+        window.refreshingToken = false;
     }
 }
 
+
+function autoRefreshJWT() {
+    setInterval(async () => {
+        console.log("🔄 Vérification automatique du JWT...");
+        const token = getToken();
+        
+        if (token && isJwtExpired(token)) {
+            console.warn("⚠️ Token expiré, tentative de rafraîchissement...");
+            await refreshToken();
+        } else {
+            console.log("✅ Token encore valide, pas de refresh nécessaire.");
+        }
+    }, 15 * 60 * 1000); // Toutes les 15 minutes
+}
+
+// Lancer le rafraîchissement automatique
+autoRefreshJWT();
+
+
+// 🔄 Vérification et enregistrement global pour la console
+window.refreshToken = refreshToken;
 
 export function logout(clearRefresh = true) {
     console.warn("👋 Déconnexion en cours...");
@@ -168,11 +172,12 @@ function resetSessionTimer() {
 
 function checkInactivity() {
     const lastActivity = sessionStorage.getItem("lastActivity");
-    if (lastActivity && Date.now() - lastActivity > 30 * 60 * 1000) {
+    if (lastActivity && Date.now() - lastActivity > 7 * 24 * 60 * 60 * 1000) { // 7 jours
         console.warn("🚨 Session expirée après inactivité !");
         logout();
     }
 }
+
 
 window.addEventListener("mousemove", resetSessionTimer);
 window.addEventListener("keydown", resetSessionTimer);

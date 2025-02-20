@@ -82,7 +82,6 @@ const goToDashboard = () => {
   width: 450px;
   padding: 30px;
   background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
   border-radius: 16px;
   border: 2px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0px 10px 40px rgba(0, 0, 0, 0.6);

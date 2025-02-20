@@ -53,29 +53,27 @@
   
   <style scoped>
   .fullwidth-container {
-    width: 100vw;
-    max-width: 100%;
-    margin: 0;
-    padding: 20px;
-  }
-  
-  .iframe-container {
+  width: 100vw; /* Pleine largeur de l'écran */
+  max-width: 100%;
+  margin: 0;
+  padding: 20px;
+  display: flex;
+  justify-content: center; /* Centre le formulaire */
+}
+
+.iframe-container {
+  width: 100%; /* Pleine largeur */
+  max-width: 1400px; /* Limite la largeur pour éviter les débordements */
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
-  max-width: 1200px;
-  margin: auto;
-  padding: px;
 }
 
 .google-form {
   width: 100%;
-  min-height: 600px;
-  max-height: 90vh;
-  border: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  height: 90vh; /* Ajuste la hauteur pour éviter un scroll externe */
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
   </style>

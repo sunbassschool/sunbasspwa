@@ -154,7 +154,7 @@ export default {
       },
       loading: true,
       error: "",
-      cacheDuration: 10 * 60 * 1000,
+      cacheDuration: 24 * 60 * 60 * 1000,
       apiBaseURL: "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/",
       routes: {
         GET: "AKfycbzhx-QtcI-0pzAl1VuXhsd6Ju74rTz7AJsU34jO61mT_lxq4lqin7ueSsm68cfscJQi_Q/exec",
@@ -427,7 +427,7 @@ export default {
 /* Effet verre pour la carte principale */
 .glass-card {
   background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  
   border-radius: 15px;
   box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
   padding: 20px;
@@ -437,7 +437,7 @@ export default {
 .glass-card:hover {
   transform: translateY(-10px); /* Légère montée au survol */
   box-shadow: 0px 15px 25px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(8px); /* Blur réduit pour moins d'effet flou */
+  
 }
 
 

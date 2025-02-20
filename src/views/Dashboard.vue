@@ -23,19 +23,30 @@
 
       <!-- ✅ Contenu principal si l'élève est connecté -->
       <div v-else class="content">
-        <!-- 🔄 Bouton mise à jour cache -->
-        <button @click="forceUpdateCache" class="update-cache-btn">🔄 Mettre à jour</button>
 
         <div 
           v-for="(card, index) in cards" 
           :key="index" 
-          class="fade-in"
+          class="fade-in position-relative"
           :class="{ 'first-card': index === 0 }"
         >
           <div class="dashboard-card rounded-3 p-4 d-flex align-items-center">
             <i :class="card.icon" class="icon me-3"></i>
             <div>
-              <h3 class="h5 mb-1">{{ card.title }}</h3>
+              <h3 class="h5 mb-1 d-flex align-items-center">
+                {{ card.title }}
+
+                <!-- 🔄 Bouton mise à jour visible uniquement sur la première carte -->
+                <button 
+  v-if="index === 0 || index === 1" 
+  @click="forceUpdateCache" 
+  class="update-cache-btn ms-2"
+>
+  <i class="bi bi-arrow-clockwise"></i>
+</button>
+
+
+              </h3>
               <p class="text-muted mb-0" v-html="card.text"></p>
             </div>
           </div>
@@ -46,6 +57,7 @@
     </div>
   </Layout>
 </template>
+
 
 <script>
 import Layout from "../views/Layout.vue";
@@ -58,7 +70,7 @@ export default {
     return {
       cards: [],
       isLoading: true, // 🚀 Ajout du spinner au chargement
-      cacheDuration: 5 * 60 * 1000, // ⏳ Durée du cache : 5 minutes
+      cacheDuration: 24 * 60 * 60 * 1000, // ⏳ Durée du cache : 5 minutes
     };
   },
   computed: {

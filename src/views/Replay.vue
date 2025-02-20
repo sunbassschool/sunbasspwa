@@ -65,7 +65,7 @@ export default {
     const RANGE = "'Vidéos pédagogiques'!A2:F"; 
 
     // ⏳ Définition de la durée du cache (5 minutes)
-    const cacheDuration = 5 * 60 * 1000;
+    const cacheDuration = 24 * 60 * 60 * 1000;
 
     const fetchVideos = async () => {
       const cacheKey = "videos_cache";
