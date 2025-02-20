@@ -16,6 +16,19 @@ import CreatePlanning from "@/views/CreatePlanning.vue";
 import { refreshToken } from '@/utils/api'
 
 const baseUrl = import.meta.env.MODE === "production" ? "/app/" : "/";
+function getUserRole() {
+    const token = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
+    if (!token) return null;
+
+    try {
+        const payload = JSON.parse(atob(token.split(".")[1])); // Décoder le JWT
+        console.log("🎫 JWT Payload :", payload); // ✅ Vérifie le rôle dans la console
+        return payload.role || null; // Retourne le rôle ou null si non défini
+    } catch (error) {
+        console.error("❌ Erreur lors de la récupération du rôle :", error);
+        return null;
+    }
+}
 
 const router = createRouter({
   history: createWebHistory(baseUrl),
@@ -33,7 +46,9 @@ const router = createRouter({
       path: "/create-planning",
       name: "CreatePlanning",
       component: () => import("@/views/CreatePlanning.vue"),
+      meta: { requiresAuth: true, role: "admin" } // ✅ Seuls les admins peuvent y accéder
     },
+    
     
     {
       path: '/mon-espace',
@@ -108,32 +123,35 @@ router.beforeEach(async (to, from, next) => {
   let refreshjwt = localStorage.getItem("refreshjwt");
 
   console.log("🔍 Vérification de l'authentification...");
-  console.log("📦 JWT actuel:", jwt);
-  console.log("📦 RefreshToken disponible:", refreshjwt);
 
-  // 🔒 Vérification des routes nécessitant une authentification
   if (to.meta.requiresAuth) {
     if (!jwt) {
       if (refreshjwt) {
-        console.warn("⚠️ Aucun JWT trouvé, tentative de rafraîchissement...");
+        console.warn("⚠️ JWT expiré, tentative de rafraîchissement...");
         jwt = await refreshToken();
-
-        if (!jwt) { // 🔥 Si le refresh échoue, on force la déconnexion
-          console.error("🚨 Rafraîchissement échoué, suppression des tokens et redirection vers /login !");
-          localStorage.removeItem("jwt");
-          localStorage.removeItem("refreshjwt");
-          sessionStorage.removeItem("jwt");
+        if (!jwt) {
+          console.error("🚨 Refresh échoué, redirection vers /login");
           return next('/login');
         }
       } else {
-        console.error("🚨 Aucun JWT et aucun refresh token, redirection vers /login !");
+        console.error("🚨 Aucun JWT valide, redirection vers /login !");
         return next('/login');
       }
     }
   }
 
-  console.log("✅ Accès autorisé !");
+  // 🔒 Vérification du rôle si nécessaire
+  if (to.meta.role) {
+    const userRole = getUserRole();
+    if (userRole !== to.meta.role) {
+      console.error(`🚫 Accès refusé, rôle requis : ${to.meta.role}, votre rôle : ${userRole}`);
+      return next('/'); // Redirection sécurisée
+    }
+  }
+
   return next();
 });
+
+
 
 export default router;

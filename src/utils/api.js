@@ -1,9 +1,10 @@
 const PROXY_URL = "https://cors-proxy-37yu.onrender.com/";
-const API_BASE_URL = "https://script.google.com/macros/s/AKfycbySfC71M5ThshHntBVXvf3g0ggo9ruMqHngNUG56SLweACEv3eHRI__uloWW0M2zekfvA/exec";
+const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyaXWbAryyHp1t7HmdCHN7EuQwVlwol5u3WTtULrtN6yY9JFxjikiExxvQrakD56QRHyw/exec";
 
-// ✅ Exportation des fonctions principales
+let isRefreshing = false;
+let refreshPromise = null; // ✅ Stocker la promesse du refresh pour éviter plusieurs appels
 
-
+// ✅ Fonction générique pour envoyer des requêtes avec un JWT valide
 export async function fetchWithAuth(url, method = "GET", body = null, attempt = 1) {
     let token = getToken();
 
@@ -63,12 +64,14 @@ export async function fetchWithAuth(url, method = "GET", body = null, attempt = 
     }
 }
 
+// ✅ Récupération du JWT stocké
 function getToken() {
     const token = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
     console.log("🔍 Récupération du token :", token ? "✅ Trouvé" : "❌ Introuvable");
     return token;
 }
 
+// ✅ Vérification de l'expiration du JWT
 function isJwtExpired(token) {
     try {
         const payload = JSON.parse(atob(token.split(".")[1]));
@@ -81,54 +84,59 @@ function isJwtExpired(token) {
     }
 }
 
+// ✅ Rafraîchir le JWT (avec attente des autres appels)
 export async function refreshToken() {
-    if (window.refreshingToken) {
-        console.warn("🔄 Une tentative de refresh est déjà en cours...");
-        return null;
+    if (isRefreshing) {
+        console.warn("🔄 Une tentative de refresh est déjà en cours... Attente du premier refresh.");
+        return refreshPromise; // ✅ Attendre la promesse en cours au lieu de bloquer
     }
 
-    window.refreshingToken = true; // Empêche plusieurs refresh en parallèle
-    
-    const email = sessionStorage.getItem("email");
-    let storedRefreshToken = localStorage.getItem("refreshjwt");
+    isRefreshing = true; // ✅ Bloque les autres appels
+    refreshPromise = new Promise(async (resolve, reject) => {
+        try {
+            console.log("🔄 📡 Envoi de la requête de rafraîchissement du JWT...");
+            const storedRefreshToken = localStorage.getItem("refreshjwt");
 
-    if (!email || !storedRefreshToken) {
-        console.warn("⚠️ Impossible de rafraîchir le token : informations manquantes.");
-        logout(false);
-        window.refreshingToken = false;
-        return null;
-    }
-
-    try {
-        const url = `${PROXY_URL}${API_BASE_URL}?route=refresh&email=${encodeURIComponent(email)}&refreshToken=${encodeURIComponent(storedRefreshToken)}`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.status === "success" && data.data.jwt) {
-            localStorage.setItem("jwt", data.data.jwt);
-            sessionStorage.setItem("jwt", data.data.jwt);
-
-            if (data.data.refreshToken && data.data.refreshToken !== storedRefreshToken) {
-                localStorage.setItem("refreshjwt", data.data.refreshToken);
+            if (!storedRefreshToken) {
+                console.warn("⚠️ RefreshToken manquant, déconnexion.");
+                logout(false);
+                isRefreshing = false;
+                reject(null);
             }
 
-            console.log("✅ Token rafraîchi avec succès !");
-            return data.data.jwt;
-        } else {
-            console.error("🚨 Rafraîchissement échoué :", data);
+            const url = `${PROXY_URL}${API_BASE_URL}?route=refresh&refreshToken=${encodeURIComponent(storedRefreshToken)}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.status === "success" && data.data.jwt) {
+                localStorage.setItem("jwt", data.data.jwt);
+                sessionStorage.setItem("jwt", data.data.jwt);
+
+                if (data.data.refreshToken && data.data.refreshToken !== storedRefreshToken) {
+                    localStorage.setItem("refreshjwt", data.data.refreshToken);
+                }
+
+                console.log("✅ Token rafraîchi avec succès !");
+                resolve(data.data.jwt);
+            } else {
+                console.error("🚨 Rafraîchissement échoué :", data);
+                logout();
+                reject(null);
+            }
+        } catch (error) {
+            console.error("🚨 Erreur lors du rafraîchissement :", error);
             logout();
-            return null;
+            reject(null);
+        } finally {
+            isRefreshing = false;
+            refreshPromise = null; // ✅ Réinitialiser après le refresh
         }
-    } catch (error) {
-        console.error("🚨 Erreur lors du rafraîchissement :", error);
-        logout();
-        return null;
-    } finally {
-        window.refreshingToken = false;
-    }
+    });
+
+    return refreshPromise;
 }
 
-
+// ✅ Rafraîchissement automatique toutes les 15 minutes
 function autoRefreshJWT() {
     setInterval(async () => {
         console.log("🔄 Vérification automatique du JWT...");
@@ -143,13 +151,10 @@ function autoRefreshJWT() {
     }, 15 * 60 * 1000); // Toutes les 15 minutes
 }
 
-// Lancer le rafraîchissement automatique
+// ✅ Lancer le rafraîchissement automatique
 autoRefreshJWT();
 
-
-// 🔄 Vérification et enregistrement global pour la console
-window.refreshToken = refreshToken;
-
+// ✅ Déconnexion de l'utilisateur
 export function logout(clearRefresh = true) {
     console.warn("👋 Déconnexion en cours...");
 
@@ -165,22 +170,50 @@ export function logout(clearRefresh = true) {
         window.location.href = "/login";
     }, 500);
 }
+export function getUserRole() {
+    const token = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
+    if (!token) return null;
 
-function resetSessionTimer() {
-    sessionStorage.setItem("lastActivity", Date.now());
-}
-
-function checkInactivity() {
-    const lastActivity = sessionStorage.getItem("lastActivity");
-    if (lastActivity && Date.now() - lastActivity > 7 * 24 * 60 * 60 * 1000) { // 7 jours
-        console.warn("🚨 Session expirée après inactivité !");
-        logout();
+    try {
+        const payload = JSON.parse(atob(token.split(".")[1])); // Décoder le JWT
+        console.log("🎫 JWT Payload :", payload); // ✅ Vérifie le rôle dans la console
+        return payload.role || null; // Retourne le rôle ou null si non défini
+    } catch (error) {
+        console.error("❌ Erreur lors de la récupération du rôle :", error);
+        return null;
     }
 }
 
 
+// ✅ Gestion de l'inactivité (déconnexion après 7 jours)
+function resetSessionTimer() {
+    const now = Date.now();
+    sessionStorage.setItem("lastActivity", now);
+    console.log("✅ Activité détectée, mise à jour de lastActivity :", new Date(now).toLocaleString());
+}
+function checkInactivity() {
+    const lastActivity = sessionStorage.getItem("lastActivity");
+    console.log("🕒 Valeur brute de lastActivity :", lastActivity);
+
+    console.log("⏳ Vérification de l'inactivité...");
+    console.log("🕒 Dernière activité enregistrée :", lastActivity ? new Date(Number(lastActivity)).toLocaleString() : "❌ Aucune activité détectée");
+
+    if (lastActivity && (Date.now() - Number(lastActivity)) > 7 * 24 * 60 * 60 * 1000) { // 7 jours
+        console.warn("🚨 Session expirée après inactivité !");
+        logout();
+    } else {
+        console.log("✅ Session encore valide !");
+    }
+}
+
+
+
+// ✅ Écoute les événements utilisateur pour reset le timer d’inactivité
 window.addEventListener("mousemove", resetSessionTimer);
 window.addEventListener("keydown", resetSessionTimer);
 window.addEventListener("click", resetSessionTimer);
 
+// ✅ Vérification toutes les 5 minutes
 setInterval(checkInactivity, 5 * 60 * 1000);
+checkInactivity(); // 🔥 Vérification immédiate de l'inactivité au chargement
+

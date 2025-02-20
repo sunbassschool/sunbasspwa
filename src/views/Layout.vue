@@ -66,7 +66,10 @@
 
     <!-- ✅ Contenu principal -->
     <main class="page-content" :class="{ 'fullwidth': isFullScreenPage }">
-
+      
+    <div v-if="isRefreshing" class="loading">
+      🔄 Rafraîchissement en cours...
+    </div>
       <slot></slot>
     </main>
 
@@ -131,13 +134,14 @@ export default {
       jwt: sessionStorage.getItem("jwt") || localStorage.getItem("jwt") || "",
       refreshjwt: localStorage.getItem("refreshjwt") || "",
       showMenu: false,
+      isRefreshing: false, // ✅ Ajout de la variable
       isMobile: window.innerWidth < 768,
       isLoading: false,
       showInstallButton: false,
       deferredPrompt: null,
       tokenCheckInterval: null, // 🔄 Vérification de l'expiration du JWT
       apiBaseURL:
-        "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbzr3s5LetwWmr96wxj8v-IsG95zQjmUdhotWGBQV65BfPiZYdBpipcyqz2pLWxd0vYBtA/exec",
+        "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbyaXWbAryyHp1t7HmdCHN7EuQwVlwol5u3WTtULrtN6yY9JFxjikiExxvQrakD56QRHyw/exec",
       fullScreenPages: ["/register-cursus"], // ✅ Tableau statique ici
     };
   },
@@ -289,17 +293,16 @@ export default {
 
     try {
         console.log("🔄 📡 Envoi de la requête de rafraîchissement du JWT...");
-        const response = await fetch(`${this.apiBaseURL}?route=refresh`, {
-            method: "POST",
+        
+        // ✅ Passer le refreshToken directement en paramètre GET
+        const url = `${this.apiBaseURL}?route=refresh&refreshToken=${encodeURIComponent(this.refreshjwt)}`;
+
+        const response = await fetch(url, {
+            method: "GET",  // ✅ L'API actuelle utilise GET
             headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        "Authorization": `Bearer ${localStorage.getItem("refreshjwt")}`
-    },
-            body: JSON.stringify({
-              route: "refresh",
-                refreshToken: this.refreshjwt // ✅ Envoi uniquement le refreshToken dans le body
-            })
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            }
         });
 
         const data = await response.json();
@@ -317,6 +320,7 @@ export default {
         this.logout();
     }
 }
+
 ,
     logout() {
       console.log("🚪 Déconnexion en cours...");
@@ -505,6 +509,21 @@ export default {
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   z-index: 1100;
 }
+
+.loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 15px 20px;
+  border-radius: 5px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+
 
 .navbar-nav {
   display: flex;
