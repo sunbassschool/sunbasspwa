@@ -3,7 +3,25 @@ const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyaXWbAryyHp1t7Hmd
 
 let isRefreshing = false;
 let refreshPromise = null; // ✅ Stocker la promesse du refresh pour éviter plusieurs appels
-
+import axios from 'axios';
+export async function checkAdminAccess() {
+    try {
+      const token = sessionStorage.getItem("jwt"); // Récupérer le JWT depuis sessionStorage
+      if (!token) {
+        throw new Error("Token manquant");
+      }
+  
+      const response = await axios.get('/api/check-admin-access', {
+        headers: {
+          Authorization: `Bearer ${token}` // Envoi du JWT dans l'en-tête
+        }
+      });
+  
+      return response.data; // Retourne la réponse avec `isAdmin`
+    } catch (error) {
+      throw new Error("Erreur lors de la vérification de l'accès : " + error.message);
+    }
+  }
 // ✅ Fonction générique pour envoyer des requêtes avec un JWT valide
 export async function fetchWithAuth(url, method = "GET", body = null, attempt = 1) {
     let token = getToken();

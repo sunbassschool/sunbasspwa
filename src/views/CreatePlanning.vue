@@ -30,7 +30,7 @@ import Layout from "../views/Layout.vue";
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { getUserRole } from "@/utils/api.js"; // Fonction qui extrait le rôle du JWT
-
+import { checkAdminAccess } from "@/utils/api.js";
 export default {
 name: "CreatePlanning",
 components: { Layout },

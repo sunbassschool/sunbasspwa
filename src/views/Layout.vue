@@ -55,7 +55,7 @@
        S'inscrire à un <br />cursus
 </router-link>
 <router-link to="/create-planning" class="nav-link mon-espace">
-  <i class="bi bi-calendar-plus"></i> Créer un Planning
+  <i class="bi bi-calendar-plus" role="status"></i> Créer un Planning
 </router-link>
 
       <button v-if="isLoggedIn" @click="logout" class="nav-link logout">
