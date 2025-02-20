@@ -137,7 +137,7 @@ export default {
       deferredPrompt: null,
       tokenCheckInterval: null, // 🔄 Vérification de l'expiration du JWT
       apiBaseURL:
-        "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbySfC71M5ThshHntBVXvf3g0ggo9ruMqHngNUG56SLweACEv3eHRI__uloWW0M2zekfvA/exec",
+        "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbzr3s5LetwWmr96wxj8v-IsG95zQjmUdhotWGBQV65BfPiZYdBpipcyqz2pLWxd0vYBtA/exec",
       fullScreenPages: ["/register-cursus"], // ✅ Tableau statique ici
     };
   },
@@ -166,25 +166,32 @@ export default {
   },
   mounted() {
     console.log("✅ Vérification de la session existante...");
-
+    window.refreshToken = this.refreshToken;
     setTimeout(() => {
-      this.checkExistingSession();
-    }, 500); // ✅ Correction de l'erreur de syntaxe
+        this.checkExistingSession();
+    }, 500);
 
-    this.tokenCheckInterval = setInterval(this.checkTokenExpiration, 60000); // Vérification toutes les 60s
+    this.tokenCheckInterval = setInterval(this.checkTokenExpiration, 60000);
+
+    window.refreshToken = this.refreshToken; // 🔥 Ajout temporaire pour test dans la console
 
     window.addEventListener("resize", this.checkMobile);
     window.addEventListener("beforeinstallprompt", (event) => {
-      event.preventDefault();
-      this.deferredPrompt = event;
-      this.showInstallButton = true;
+        event.preventDefault();
+        this.deferredPrompt = event;
+        this.showInstallButton = true;
     });
-  },
+}
+,
   beforeUnmount() {
     clearInterval(this.tokenCheckInterval);
     window.removeEventListener("resize", this.checkMobile);
   },
   methods: {
+    refresh() {
+    console.log("🔄 Rafraîchissement manuel de l'interface...");
+    this.$forceUpdate(); // Force un re-render de Vue
+  },
     toggleMenu() {
       this.showMenu = !this.showMenu;
 
@@ -274,37 +281,43 @@ export default {
       }
     },
     async refreshToken() {
-      if (!this.refreshjwt) {
+    if (!this.refreshjwt) {
         console.log("❌ Aucun refresh token disponible.");
         this.logout();
         return;
-      }
+    }
 
-      try {
-        console.log("🔄 Tentative de rafraîchissement du JWT...");
-        const response = await fetch(this.apiBaseURL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            route: "refresh",
-            refreshToken: this.refreshjwt,
-          }),
+    try {
+        console.log("🔄 📡 Envoi de la requête de rafraîchissement du JWT...");
+        const response = await fetch(`${this.apiBaseURL}?route=refresh`, {
+            method: "POST",
+            headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "Authorization": `Bearer ${localStorage.getItem("refreshjwt")}`
+    },
+            body: JSON.stringify({
+              route: "refresh",
+                refreshToken: this.refreshjwt // ✅ Envoi uniquement le refreshToken dans le body
+            })
         });
 
         const data = await response.json();
+        console.log("🔍 Réponse du serveur :", data);
 
-        if (data.status === "success") {
-          console.log("✅ JWT rafraîchi !");
-          this.storeSession(data.data);
+        if (data.status === "success" && data.data.jwt) {
+            console.log("✅ JWT rafraîchi !");
+            this.storeSession(data.data);
         } else {
-          console.error("🚨 Impossible de rafraîchir le JWT :", data.message);
-          this.logout();
+            console.error("🚨 Impossible de rafraîchir le JWT :", data.message);
+            this.logout();
         }
-      } catch (error) {
+    } catch (error) {
         console.error("🚨 Erreur lors du rafraîchissement du JWT :", error);
         this.logout();
-      }
-    },
+    }
+}
+,
     logout() {
       console.log("🚪 Déconnexion en cours...");
 

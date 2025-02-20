@@ -27,7 +27,6 @@
                   type="password" 
                   id="password" 
                   name="password"
-
                   class="form-control" 
                   required 
                   autocomplete="new-password"
@@ -38,7 +37,6 @@
               style="display:none" autocomplete="new-password">
 
               <button type="submit" :disabled="loading" class="btn btn-primary w-100">
-
                 <span v-if="!loading">Se connecter</span>
                 <span v-else>Connexion en cours...</span>
               </button>
@@ -57,6 +55,7 @@
   </Layout>
 </template>
 
+
 <script>
 import Layout from "../views/Layout.vue";
 import { jwtDecode } from "jwt-decode";
@@ -72,7 +71,7 @@ export default {
       messageType: "",
       jwt: sessionStorage.getItem("jwt") || "",  
       refreshjwt: localStorage.getItem("refreshjwt") || "",  
-      apiBaseURL: "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbxGCCibB7xk6fG9O_zAzlAVgiyf1AdSD58LUWV90fFWu3tHstfTqRs0KjOkSZKBGki-Rg/exec",
+      apiBaseURL: "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbzr3s5LetwWmr96wxj8v-IsG95zQjmUdhotWGBQV65BfPiZYdBpipcyqz2pLWxd0vYBtA/exec",
       loading: false,
       isLoading: false, // Ajoute ceci
       progress: 0,
@@ -86,24 +85,23 @@ export default {
     }
   },
   mounted() {
-  console.log("✅ Vérification du JWT au chargement...");
+    console.log("✅ Vérification du JWT au chargement...");
+    this.jwt = localStorage.getItem("jwt") || "";
+    this.refreshjwt = localStorage.getItem("refreshjwt") || "";
 
-  this.jwt = localStorage.getItem("jwt") || "";
-  this.refreshjwt = localStorage.getItem("refreshjwt") || "";
+    if (this.jwt) {
+      this.decodeJWT(this.jwt);
+      this.checkTokenExpiration();
+    } else if (this.refreshjwt) {
+      console.log("🔄 Aucun JWT, tentative de rafraîchissement...");
+      this.refreshToken();
+    }
 
-  if (this.jwt) {
-    this.decodeJWT(this.jwt);
-    this.checkTokenExpiration();
-  } else if (this.refreshjwt) {
-    console.log("🔄 Aucun JWT, tentative de rafraîchissement...");
-    this.refreshToken();
-  }
-
-  this.tokenCheckInterval = setInterval(() => {
-    console.log("⏳ Vérification automatique du token...");
-    this.checkTokenExpiration();
-  }, 5 * 60 * 1000);}, // ✅ Vérification toutes les 5 minutes
-
+    this.tokenCheckInterval = setInterval(() => {
+      console.log("⏳ Vérification automatique du token...");
+      this.checkTokenExpiration();
+    }, 5 * 60 * 1000); // ✅ Vérification toutes les 5 minutes
+  },
   beforeUnmount() {
     clearInterval(this.tokenCheckInterval);
   },
@@ -156,9 +154,8 @@ export default {
           this.setMessage("✅ Connexion réussie", "alert-success");
           this.$router.push('/dashboard');
           setTimeout(() => {
-  window.location.reload();
-}, 500);
-
+            window.location.reload();
+          }, 500);
         }
       } catch (error) {
         console.error("🚨 Erreur lors de la connexion :", error);
@@ -187,19 +184,16 @@ export default {
     },
 
     storeSession(data) {
-  sessionStorage.setItem("jwt", data.jwt);
-  localStorage.setItem("jwt", data.jwt);
-  localStorage.setItem("refreshjwt", data.refreshToken);
-  this.jwt = data.jwt;
-  this.refreshjwt = data.refreshToken;
-  this.decodeJWT(data.jwt);
+      sessionStorage.setItem("jwt", data.jwt);
+      localStorage.setItem("jwt", data.jwt);
+      localStorage.setItem("refreshjwt", data.refreshToken);
+      this.jwt = data.jwt;
+      this.refreshjwt = data.refreshToken;
+      this.decodeJWT(data.jwt);
 
-  console.log("🔄 JWT stocké : ", sessionStorage.getItem("jwt"));
-  console.log("🔄 Refresh Token stocké : ", localStorage.getItem("refreshjwt"));
-}
-
-
-,
+      console.log("🔄 JWT stocké : ", sessionStorage.getItem("jwt"));
+      console.log("🔄 Refresh Token stocké : ", localStorage.getItem("refreshjwt"));
+    },
 
     decodeJWT(jwt) {
       try {
@@ -207,7 +201,7 @@ export default {
         console.log("🎫 JWT décodé :", decoded);
         sessionStorage.setItem("prenom", decoded.prenom || "");
         sessionStorage.setItem("email", decoded.email || "");
-         localStorage.setItem("prenom", decoded.prenom || "");
+        localStorage.setItem("prenom", decoded.prenom || "");
       } catch (error) {
         console.error("🚨 Erreur lors du décodage du JWT :", error);
       }
@@ -218,64 +212,62 @@ export default {
       if (jwt) {
         console.log("🔄 Décodage du JWT pour récupérer les infos...");
         this.decodeJWT(jwt);
-        this.checkTokenExpiration();
       }
     },
+
     checkTokenExpiration() {
-  if (!this.jwt) return;
+      if (!this.jwt) return;
 
-  try {
-    const decoded = jwtDecode(this.jwt);
-    const expTime = decoded.exp * 1000; // Convertir en millisecondes
-    const currentTime = Date.now();
-    const timeLeft = expTime - currentTime;
+      try {
+        const decoded = jwtDecode(this.jwt);
+        const expTime = decoded.exp * 1000; // Convertir en millisecondes
+        const currentTime = Date.now();
+        const timeLeft = expTime - currentTime;
 
-    console.log(`🕒 JWT valide encore ${Math.floor(timeLeft / 1000)} secondes`);
+        console.log(`🕒 JWT valide encore ${Math.floor(timeLeft / 1000)} secondes`);
 
-    if (timeLeft < 10 * 60 * 1000) { // Moins de 10 minutes avant expiration
-      console.log("🔄 JWT bientôt expiré, tentative de rafraîchissement...");
-      this.refreshToken();
-    }
-  } catch (error) {
-    console.error("🚨 Erreur JWT :", error);
-    this.logout();
-  }
-}
+        if (timeLeft < 10 * 60 * 1000) { // Moins de 10 minutes avant expiration
+          console.log("🔄 JWT bientôt expiré, tentative de rafraîchissement...");
+          this.refreshToken();
+        }
+      } catch (error) {
+        console.error("🚨 Erreur JWT :", error);
+        this.logout();
+      }
+    },
 
-,
-async refreshToken() {
-  if (!this.refreshjwt) {
-    console.log("❌ Aucun refresh token disponible.");
-    this.logout();
-    return;
-  }
+    async refreshToken() {
+      if (!this.refreshjwt) {
+        console.log("❌ Aucun refresh token disponible.");
+        this.logout();
+        return;
+      }
 
-  try {
-    console.log("🔄 Tentative de rafraîchissement du JWT...");
-    const response = await fetch(this.apiBaseURL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        route: "refreshToken",
-        refreshToken: this.refreshjwt, // Envoyer le refreshToken au serveur
-      }),
-    });
+      try {
+        console.log("🔄 Tentative de rafraîchissement du JWT...");
+        const response = await fetch(this.apiBaseURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            route: "refreshToken",
+            refreshToken: this.refreshjwt, // Envoyer le refreshToken au serveur
+          }),
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (data.status === "success") {
-      console.log("✅ JWT rafraîchi !");
-      this.storeSession(data.data); // Met à jour le JWT et le refreshToken
-    } else {
-      console.error("🚨 Impossible de rafraîchir le JWT :", data.message);
-      this.logout();
-    }
-  } catch (error) {
-    console.error("🚨 Erreur lors du rafraîchissement du JWT :", error);
-    this.logout();
-  }
-}
-,
+        if (data.status === "success") {
+          console.log("✅ JWT rafraîchi !");
+          this.storeSession(data.data); // Met à jour le JWT et le refreshToken
+        } else {
+          console.error("🚨 Impossible de rafraîchir le JWT :", data.message);
+          this.logout();
+        }
+      } catch (error) {
+        console.error("🚨 Erreur lors du rafraîchissement du JWT :", error);
+        this.logout();
+      }
+    },
 
     logout() {
       sessionStorage.clear();
