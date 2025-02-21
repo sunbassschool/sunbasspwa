@@ -13,7 +13,7 @@ import RegisterForm from '@/views/RegisterForm.vue'
 import Prendreuncours from '@/views/Prendreuncours.vue'
 import RegisterCursus from "../views/RegisterCursus.vue"
 import CreatePlanning from "@/views/CreatePlanning.vue";
-import { refreshToken } from '@/utils/api'
+import { refreshToken } from '@/utils/api.js'
 
 const baseUrl = import.meta.env.MODE === "production" ? "/app/" : "/";
 function getUserRole() {

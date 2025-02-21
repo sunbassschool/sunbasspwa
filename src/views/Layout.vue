@@ -51,16 +51,18 @@
         <span>Mon Espace</span>
       </router-link>
       <router-link to="/register-cursus" class="nav-link mon-espace">
-        <i class="bi bi-person-plus"></i>
-       S'inscrire à un <br />cursus
+        <i class="bi bi-music-note-beamed"></i>
+       Prendre un cours
 </router-link>
 <router-link to="/create-planning" class="nav-link mon-espace">
-  <i class="bi bi-calendar-plus" role="status"></i> Créer un Planning
+  <i class="bi bi-calendar-event"role="status"></i> Créer un Planning
 </router-link>
 
       <button v-if="isLoggedIn" @click="logout" class="nav-link logout">
         <i class="bi bi-box-arrow-right"></i> 
         <span>Déconnexion</span>
+        
+        
       </button>
     </div>
 

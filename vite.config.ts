@@ -8,7 +8,8 @@ export default defineConfig(({ mode }) => {
 
   // Injecter toutes les variables `VITE_` sur `window`
   const envWithWindow = Object.keys(env).reduce((acc, key) => {
-    acc[`window.${key}`] = JSON.stringify(env[key]);  // Convertir en string pour éviter les erreurs
+    (acc as Record<string, any>)[`window.${key}`] = JSON.stringify(env[key]);
+  // Convertir en string pour éviter les erreurs
     return acc;
   }, {});
 
