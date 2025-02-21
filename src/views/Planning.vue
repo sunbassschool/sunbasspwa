@@ -74,7 +74,7 @@ export default {
     const planningData = ref([]);
     const loading = ref(true);
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbzGV13_iuC5shxErpbzwJoRBLGPHsH5osBvw0K2M_xh_TsJx9P0Fq1A0_1S4XDd0AW3nA/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyaXWbAryyHp1t7HmdCHN7EuQwVlwol5u3WTtULrtN6yY9JFxjikiExxvQrakD56QRHyw/exec";
     const cacheDuration = 24 * 60 * 60 * 1000; // 24 heures
 
 

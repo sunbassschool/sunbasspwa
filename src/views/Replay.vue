@@ -5,8 +5,17 @@
       <p class="text-muted text-center">Clique sur une vidéo pour la regarder directement.</p>
 
       <!-- Barre de recherche -->
-      <input autocomplete="off" 
-      autocorrect="off"class="form-control mb-3" placeholder="🔎 Rechercher par mot-clé..." />
+      <input 
+  v-model="search" 
+  class="form-control mb-3" 
+  placeholder="🔎 Rechercher par mot-clé..." 
+  autocomplete="off" 
+  autocorrect="off"
+  autocapitalize="off"
+  spellcheck="false"
+  name="search-field"
+  id="search-field"
+/>
 
       <!-- Chargement -->
       <div v-if="loading" class="d-flex justify-content-center mt-4">

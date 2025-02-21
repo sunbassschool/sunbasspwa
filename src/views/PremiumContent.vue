@@ -27,7 +27,7 @@
     methods: {
       async fetchUserInfo() {
         try {
-          const apiUrl = "https://script.google.com/macros/s/AKfycbze7GQsS-5ptUUTwAcjry5mLOzKVDbaEJ_fkr0jBVM45ab9UafMtcTUtwkEKp0HHVh5mg/exec";
+          const apiUrl = "https://script.google.com/macros/s/AKfycbyaXWbAryyHp1t7HmdCHN7EuQwVlwol5u3WTtULrtN6yY9JFxjikiExxvQrakD56QRHyw/exec";
           const url = `${apiUrl}?route=getUser&jwt=${localStorage.getItem("jwt")}`;
           const response = await fetch(url);
           const userInfo = await response.json();

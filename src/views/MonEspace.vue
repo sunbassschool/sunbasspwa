@@ -157,8 +157,8 @@ export default {
       cacheDuration: 24 * 60 * 60 * 1000,
       apiBaseURL: "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/",
       routes: {
-        GET: "AKfycbzhx-QtcI-0pzAl1VuXhsd6Ju74rTz7AJsU34jO61mT_lxq4lqin7ueSsm68cfscJQi_Q/exec",
-        POST: "AKfycbwY21fDDGxxDabhjSERwQrpGe_dqdbeqebU5MGbLZUT3ilFMKdtGOqswGykCJuOjW72EQ/exec"
+        GET: "AKfycbyaXWbAryyHp1t7HmdCHN7EuQwVlwol5u3WTtULrtN6yY9JFxjikiExxvQrakD56QRHyw/exec",
+        POST: "AKfycbyaXWbAryyHp1t7HmdCHN7EuQwVlwol5u3WTtULrtN6yY9JFxjikiExxvQrakD56QRHyw/exec"
       }
     };
   },
