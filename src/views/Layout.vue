@@ -152,11 +152,14 @@ export default {
       return !!this.jwt;
     },
     prenom() {
-      return sessionStorage.getItem("prenom") || "";
+      return sessionStorage.getItem("prenom") || localStorage.getItem("prenom") || "";
     },
     isPremium() {
       return sessionStorage.getItem("abo") === "premium";
     },
+    email() {
+    return sessionStorage.getItem("email") || localStorage.getItem("email") || "";
+  },
     isAdmin() {
       return sessionStorage.getItem("role") === "admin";
     },
@@ -257,15 +260,23 @@ export default {
       this.decodeJWT(data.jwt);
     },
     decodeJWT(jwt) {
-      try {
-        const decoded = jwtDecode(jwt);
-        console.log("🎫 JWT décodé :", decoded);
-        sessionStorage.setItem("prenom", decoded.prenom || "");
-        sessionStorage.setItem("email", decoded.email || "");
-      } catch (error) {
-        console.error("🚨 Erreur lors du décodage du JWT :", error);
-      }
-    },
+  try {
+    const decoded = jwtDecode(jwt);
+    console.log("🎫 JWT décodé :", decoded);
+    
+    // Stockage dans sessionStorage
+    sessionStorage.setItem("prenom", decoded.prenom || "");
+    sessionStorage.setItem("email", decoded.email || "");
+
+    // Stockage dans localStorage
+    localStorage.setItem("prenom", decoded.prenom || "");
+    localStorage.setItem("email", decoded.email || "");
+
+  } catch (error) {
+    console.error("🚨 Erreur lors du décodage du JWT :", error);
+  }
+}
+,
     checkTokenExpiration() {
       if (!this.jwt) return;
 

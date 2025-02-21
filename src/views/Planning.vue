@@ -74,7 +74,7 @@ export default {
     const planningData = ref([]);
     const loading = ref(true);
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbyaXWbAryyHp1t7HmdCHN7EuQwVlwol5u3WTtULrtN6yY9JFxjikiExxvQrakD56QRHyw/exec";
+    const API_URL = "https://cors-proxy-37yu.onrender.com/https://script.google.com/macros/s/AKfycbxKoUZ6lGh61CPre7amCLqa4_fLyIYWmJ_IKc6Nnbh8VrlSkAbDRczuBEJu6PDItUcdNg/exec";
     const cacheDuration = 24 * 60 * 60 * 1000; // 24 heures
 
 
@@ -108,8 +108,9 @@ export default {
 });
 
     // ✅ Récupère l'email et prénom depuis le JWT
-    const email = computed(() => sessionStorage.getItem("email") || "");
-    const prenom = computed(() => sessionStorage.getItem("prenom") || "");
+    const email = computed(() => sessionStorage.getItem("email") || localStorage.getItem("email") || "");
+const prenom = computed(() => sessionStorage.getItem("prenom") || localStorage.getItem("prenom") || "");
+
 
     // ✅ Formatte la date pour l'affichage
     const formatDate = (rawDate) => {
@@ -152,80 +153,55 @@ export default {
     };
 
     const fetchPlanningData = async () => {
-      if (!isLoggedIn.value) {
+  if (!isLoggedIn.value) {
+    loading.value = false;
+    return;
+  }
+
+  const cacheKey = `planning_${email.value}_${prenom.value}`;
+  const cacheTimestampKey = `${cacheKey}_timestamp`;
+  const cachedData = localStorage.getItem(cacheKey);
+  const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
+  const cacheExpired = !cacheTimestamp || Date.now() - parseInt(cacheTimestamp, 10) > cacheDuration;
+
+  if (cachedData && !cacheExpired) {
+    try {
+      const parsedData = JSON.parse(cachedData);
+      if (parsedData.success && parsedData.planning) {
+        console.log("⚡ Chargement du planning depuis le cache !");
+        planningData.value = parsedData.planning;
         loading.value = false;
         return;
       }
+    } catch (error) {
+      console.error("❌ Erreur de parsing du cache :", error);
+    }
+  }
 
-      const cacheKey = `planning_${email.value}_${prenom.value}`;
-      const cacheTimestampKey = `${cacheKey}_timestamp`;
-      const cachedData = localStorage.getItem(cacheKey);
-      const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
-      const cacheTimestampNumber = parseInt(cacheTimestamp, 10) || 0;
-      const cacheExpired = !cacheTimestampNumber || Date.now() - cacheTimestampNumber > cacheDuration;
+  console.log("🌐 Requête envoyée :", `${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
 
-      // 🔍 Vérifier si le cache est valide avant d'appeler l'API
-      if (cachedData && !cacheExpired) {
-        try {
-          console.log("📦 Contenu brut du cache avant parsing :", cachedData);
-          const parsedData = JSON.parse(cachedData);
+  try {
+    const response = await axios.get(`${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
+    
+    console.log("✅ Réponse complète de l'API :", response.data);
 
-          if (isCacheValid(parsedData)) {
-            console.log("⚡ Chargement du planning depuis le cache !");
-            planningData.value = Array.isArray(parsedData) ? parsedData : [];
-            loading.value = false;
-            return;
-          } else {
-            console.warn("🚨 Cache invalide ou incomplet, récupération depuis l'API...");
-          }
-        } catch (error) {
-          console.error("❌ Erreur de parsing du cache :", error);
-          console.log("📦 Données brutes du cache corrompu :", cachedData);
-          return; // 🔥 NE PAS SUPPRIMER AUTOMATIQUEMENT
-        }
-      }
+    if (response.data.success && response.data.planning) {
+      planningData.value = response.data.planning;
+      
+      // ✅ Stocke en cache
+      localStorage.setItem(cacheKey, JSON.stringify(response.data));
+      localStorage.setItem(cacheTimestampKey, Date.now().toString());
+    } else {
+      console.warn("⚠️ L'API n'a pas retourné de planning valide.");
+    }
+  } catch (error) {
+    console.error("❌ Erreur lors du chargement des cours :", error);
+    alert("Une erreur est survenue lors du chargement de ton planning.");
+  } finally {
+    loading.value = false;
+  }
+};
 
-      // 🔄 Si le cache est expiré, récupérer les nouvelles données depuis l'API
-      console.log("🔄 Cache expiré, récupération des nouvelles données...");
-      try {
-        console.log("🌐 Requête envoyée :", `${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
-        const response = await axios.get(`${API_URL}?route=planning&email=${encodeURIComponent(email.value)}&prenom=${encodeURIComponent(prenom.value)}`);
-
-        console.log("✅ Réponse complète de l'API :", response.data);
-        let processedData;
-
-        // ✅ Si l'API renvoie un tableau (données valides)
-        if (Array.isArray(response.data)) {
-          processedData = response.data.map(item => ({
-            date: item.date,
-            formattedDate: formatDate(item.date),
-            meet: item.meet || "⚠️ Lien Meet non disponible",
-          }));
-        } else {
-          // ✅ Si l'API renvoie un objet (ex: erreur), on stocke quand même
-          console.warn("⚠️ API a renvoyé un objet, stockage du message d'erreur.");
-          processedData = response.data;
-        }
-
-        // ✅ Enregistrer le cache même si c'est un message d'erreur
-        localStorage.setItem(cacheKey, JSON.stringify(processedData));
-        localStorage.setItem(cacheTimestampKey, Date.now().toString());
-        console.log("✅ Données enregistrées dans le cache :", localStorage.getItem(cacheKey));
-
-        // ✅ Si ce sont des cours valides, on met à jour l'affichage
-        if (Array.isArray(processedData)) {
-          planningData.value = processedData;
-        } else {
-          console.warn("⚠️ Aucun cours trouvé, affichage du message d'erreur.");
-        }
-
-      } catch (error) {
-        console.error("❌ Erreur lors du chargement des cours :", error);
-        alert("Une erreur est survenue lors du chargement de ton planning.");
-      } finally {
-        loading.value = false;
-      }
-    };
 
     const openMeet = (url) => {
       if (url) {
